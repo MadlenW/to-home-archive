@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>To Home — Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;1,400&family=Martian+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #fafaf7;
+      cursor: none;
+      overflow: hidden;
+    }
+
+    /* ── Cursor ─────────────────────────────────── */
+    #cursor {
+      position: fixed;
+      width: 10px; height: 10px;
+      border: 1px solid #0f0f0f;
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: width 0.25s ease, height 0.25s ease;
+      z-index: 10000;
+      top: -30px; left: -30px;
+    }
+    #cursor.grow { width: 22px; height: 22px; }
+
+    /* ── Nav ────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 49px;
+      z-index: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 32px;
+      background: rgba(250,250,247,0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(15,15,15,0.07);
+    }
+    .nav-logo {
+      font-family: 'Martian Mono', monospace;
+      font-size: 9px; font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #0f0f0f;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      font-family: 'Martian Mono', monospace;
+      font-size: 9px; font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #0f0f0f;
+      text-decoration: none;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .nav-links a:hover { opacity: 1; }
+
+    /* ── Canvas ─────────────────────────────────── */
+    #canvas {
+      position: fixed;
+      top: 49px; left: 0; right: 0; bottom: 0;
+    }
+    #canvas svg { width: 100%; height: 100%; }
+
+    /* ── Blob labels ─────────────────────────────── */
+    .label-ptr { stroke: #0f0f0f; stroke-width: 0.5; opacity: 0.3; }
+    .label-tip { fill: #0f0f0f; opacity: 0.3; }
+
+    /* ── Panel ──────────────────────────────────── */
+    #panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fafaf7;
+      border-top: 1px solid rgba(15,15,15,0.14);
+      padding: 38px 52px 52px;
+      transform: translateY(100%);
+      transition: transform 0.55s cubic-bezier(0.16,1,0.3,1);
+      z-index: 400;
+      max-height: 55vh;
+      overflow-y: auto;
+    }
+    #panel.open { transform: translateY(0); }
+
+    #panel-close {
+      position: absolute;
+      top: 18px; right: 28px;
+      background: none; border: none;
+      font-family: 'Martian Mono', monospace;
+      font-size: 18px; line-height: 1;
+      color: #0f0f0f;
+      cursor: none;
+      opacity: 0.35;
+      transition: opacity 0.2s;
+    }
+    #panel-close:hover { opacity: 1; }
+
+    #panel-room {
+      font-family: 'EB Garamond', serif;
+      font-style: italic; font-size: 34px; font-weight: 400;
+      color: #0f0f0f;
+      margin-bottom: 6px; line-height: 1;
+    }
+    #panel-count {
+      font-family: 'Martian Mono', monospace;
+      font-size: 8px; text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #0f0f0f; opacity: 0.45;
+      margin-bottom: 28px;
+    }
+    #panel-frags {
+      display: flex; flex-wrap: wrap;
+      gap: 18px;
+      margin-bottom: 36px;
+    }
+    .frag-item {
+      font-family: 'EB Garamond', serif;
+      font-style: italic; font-size: 14px;
+      color: #0f0f0f; opacity: 0.55;
+      border-left: 1px solid rgba(15,15,15,0.2);
+      padding-left: 14px;
+      max-width: 240px; line-height: 1.45;
+    }
+    .panel-btns { display: flex; gap: 16px; flex-wrap: wrap; }
+    .panel-btns a {
+      font-family: 'Martian Mono', monospace;
+      font-size: 9px; text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #0f0f0f; text-decoration: none;
+      border: 1px solid #0f0f0f;
+      padding: 11px 22px;
+      transition: background 0.22s, color 0.22s;
+    }
+    .panel-btns a:hover { background: #0f0f0f; color: #fafaf7; }
+  </style>
+</head>
+<body>
+
+<div id="cursor"></div>
+
+<nav>
+  <a class="nav-logo" href="#">To Home — Archive</a>
+  <div class="nav-links">
+    <a href="#">Enter</a>
+    <a href="#">About</a>
+  </div>
+</nav>
+
+<div id="canvas">
+  <svg id="main-svg" viewBox="0 0 1000 660"
+       preserveAspectRatio="xMidYMid meet"
+       xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="organic" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.032 0.038"
+                      numOctaves="3" seed="9" result="nz"/>
+        <feDisplacementMap in="SourceGraphic" in2="nz"
+                           scale="7" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+    <g id="blobs-root"></g>
+  </svg>
+</div>
+
+<div id="panel">
+  <button id="panel-close">×</button>
+  <h2 id="panel-room"></h2>
+  <p  id="panel-count"></p>
+  <div id="panel-frags"></div>
+  <div class="panel-btns">
+    <a id="btn-enter" href="#" target="_blank" rel="noopener">Enter room →</a>
+    <a id="btn-leave" href="#" target="_blank" rel="noopener">+ Leave something</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    return e;
+  };
+
+  /* ── Room definitions ────────────────────────────── */
+  const ROOMS = [
+    { id:'kitchen',     name:'Kitchen',     cx:295, cy:450, baseR:90,
+      slug:'kitchen-_dpxnlj4op8',     lx:138, ly:515 },
+    { id:'hallway',     name:'Hallway',     cx:498, cy:312, baseR:70,
+      slug:'hallway-pmywetfnlve',     lx:510, ly:208 },
+    { id:'bathroom',    name:'Bathroom',    cx:712, cy:398, baseR:64,
+      slug:'bathroom-6orcuuzqerc',    lx:836, ly:432 },
+    { id:'bedroom',     name:'Bedroom',     cx:640, cy:155, baseR:84,
+      slug:'bedroom-cceaffchfdg',     lx:758, ly:50  },
+    { id:'living-room', name:'Living Room', cx:185, cy:225, baseR:112,
+      slug:'living-room-te9ggrtmjzc', lx:32,  ly:140 },
+  ];
+
+  /* ── Seeded LCG RNG ──────────────────────────────── */
+  function rng(seed) {
+    let s = seed | 0;
+    return () => { s = (Math.imul(s, 1664525) + 1013904223) | 0; return (s >>> 0) / 2**32; };
+  }
+
+  /* ── Organic blob point generation ──────────────── */
+  function blobPts(cx, cy, r, seed, n = 8) {
+    const rand = rng(seed);
+    return Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const rad = r * (1 + (rand() - 0.5) * 0.30);
+      return [cx + Math.cos(a) * rad, cy + Math.sin(a) * rad];
+    });
+  }
+
+  /* ── Catmull-Rom → cubic bezier closed path ──────── */
+  function pts2path(pts) {
+    const n = pts.length;
+    let d = `M${pts[0][0].toFixed(2)},${pts[0][1].toFixed(2)}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n];
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % n];
+      const p3 = pts[(i + 2) % n];
+      const c1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
+      const c1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2);
+      const c2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
+      const c2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2);
+      d += ` C${c1x},${c1y} ${c2x},${c2y} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+    }
+    return d + 'Z';
+  }
+
+  /* ── Linear interpolation between point sets ─────── */
+  function lerpPts(a, b, t) {
+    return a.map((p, i) => [p[0] + (b[i][0] - p[0]) * t, p[1] + (b[i][1] - p[1]) * t]);
+  }
+
+  /* ── Build one blob group ─────────────────────────── */
+  function buildBlob(room, idx) {
+    const { id, name, cx, cy, baseR, lx, ly } = room;
+
+    const seed1 = (id.charCodeAt(0) * 17 + idx * 7) >>> 0;
+    const seed2 = (id.charCodeAt(0) * 31 + idx * 13) >>> 0;
+    room._ptsA  = blobPts(cx, cy, baseR, seed1);
+    room._ptsB  = blobPts(cx, cy, baseR, seed2);
+    room._seed1 = seed1;
+    room._seed2 = seed2;
+    room._spd   = 0.00026 + idx * 0.00006;
+    room._phase = idx * 1.15;
+    room._r     = baseR;
+    room._count = 0;
+    room._blocks = [];
+
+    const g = svgEl('g', { id: `bg-${id}`, class: 'blob-group' });
+    g.style.transformOrigin = `${cx}px ${cy}px`;
+    g.style.transition = 'transform 0.42s ease';
+
+    /* Shadow layer */
+    const gBack = svgEl('g', { transform: 'translate(12,14)' });
+    const pBack = svgEl('path', { fill: 'none', stroke: '#d0ccc4', 'stroke-width': '1.5',
+                                   filter: 'url(#organic)' });
+    gBack.appendChild(pBack);
+
+    /* Mid layer */
+    const gMid = svgEl('g', { transform: 'translate(5,6)' });
+    const pMid = svgEl('path', { fill: 'none', stroke: '#b8b4ac', 'stroke-width': '1.5',
+                                  filter: 'url(#organic)' });
+    gMid.appendChild(pMid);
+
+    /* Front face */
+    const pFront = svgEl('path', { fill: '#fafaf7', stroke: '#0f0f0f', 'stroke-width': '1.5',
+                                    filter: 'url(#organic)' });
+
+    /* Text fragments */
+    const gFrags = svgEl('g', {});
+
+    g.appendChild(gBack);
+    g.appendChild(gMid);
+    g.appendChild(pFront);
+    g.appendChild(gFrags);
+
+    /* Pointer line */
+    const dx = lx - cx, dy = ly - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    let ex = (cx + dx / dist * baseR).toFixed(1);
+    let ey = (cy + dy / dist * baseR).toFixed(1);
+
+    const ptrLine = svgEl('line', { x1: ex, y1: ey, x2: lx, y2: ly, class: 'label-ptr' });
+    const ptrTip  = svgEl('circle', { cx: ex, cy: ey, r: '1.8', class: 'label-tip' });
+    g.appendChild(ptrLine);
+    g.appendChild(ptrTip);
+
+    /* Label: room name */
+    const anchor = lx < cx - 20 ? 'end' : lx > cx + 20 ? 'start' : 'middle';
+    const lName = svgEl('text', {
+      x: lx, y: ly,
+      'text-anchor': anchor,
+      'font-family': 'EB Garamond, serif',
+      'font-style': 'italic',
+      'font-size': '14',
+      fill: '#0f0f0f'
+    });
+    lName.textContent = name;
+
+    /* Label: trace count */
+    const lCount = svgEl('text', {
+      x: lx, y: ly + 14,
+      'text-anchor': anchor,
+      'font-family': 'Martian Mono, monospace',
+      'font-size': '8',
+      fill: '#0f0f0f',
+      opacity: '0.45'
+    });
+    lCount.textContent = '— traces';
+
+    g.appendChild(lName);
+    g.appendChild(lCount);
+
+    /* Store refs */
+    room._pBack   = pBack;
+    room._pMid    = pMid;
+    room._pFront  = pFront;
+    room._gFrags  = gFrags;
+    room._g       = g;
+    room._lCount  = lCount;
+    room._ptrLine = ptrLine;
+    room._ptrTip  = ptrTip;
+    room._dx = dx; room._dy = dy; room._dist = dist;
+
+    /* Hover */
+    g.addEventListener('mouseenter', () => {
+      g.style.transform = 'scale(1.07)';
+      cursor.classList.add('grow');
+    });
+    g.addEventListener('mouseleave', () => {
+      g.style.transform = 'scale(1)';
+      cursor.classList.remove('grow');
+    });
+
+    /* Click → panel */
+    g.addEventListener('click', () => openPanel(room));
+
+    return g;
+  }
+
+  /* ── Mount blobs ──────────────────────────────────── */
+  const root = document.getElementById('blobs-root');
+  ROOMS.forEach((r, i) => { r._idx = i; root.appendChild(buildBlob(r, i)); });
+
+  /* ── Animation loop ──────────────────────────────── */
+  function tick(ts) {
+    for (const room of ROOMS) {
+      const t = (Math.sin(ts * room._spd + room._phase) + 1) / 2;
+      const pts = lerpPts(room._ptsA, room._ptsB, t);
+      const d = pts2path(pts);
+      room._pBack.setAttribute('d', d);
+      room._pMid.setAttribute('d', d);
+      room._pFront.setAttribute('d', d);
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  /* ── Are.na API ───────────────────────────────────── */
+  const ARENA = 'https://api.are.na/v2/channels';
+
+  async function fetchRoom(room) {
+    try {
+      const res = await fetch(`${ARENA}/${room.slug}/contents?per=50`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const count    = typeof data.length === 'number' ? data.length : 0;
+      const contents = Array.isArray(data.contents) ? data.contents : [];
+
+      room._count  = count;
+      room._blocks = contents;
+
+      /* Update trace label */
+      room._lCount.textContent = `${count} trace${count !== 1 ? 's' : ''}`;
+
+      /* Grow blob */
+      const newR = room._r + Math.min(count * 3, 60);
+      room._ptsA = blobPts(room.cx, room.cy, newR, room._seed1);
+      room._ptsB = blobPts(room.cx, room.cy, newR, room._seed2);
+
+      /* Update pointer line tip to new edge */
+      const ex = (room.cx + room._dx / room._dist * newR).toFixed(1);
+      const ey = (room.cy + room._dy / room._dist * newR).toFixed(1);
+      room._ptrLine.setAttribute('x1', ex);
+      room._ptrLine.setAttribute('y1', ey);
+      room._ptrTip.setAttribute('cx', ex);
+      room._ptrTip.setAttribute('cy', ey);
+
+      /* Float text fragments inside blob */
+      const textBlocks = contents.filter(b => b.class === 'Text').slice(0, 5);
+      room._gFrags.innerHTML = '';
+      const offsets = [[0, -22], [-26, 9], [22, 18], [-14, -36], [28, -8]];
+      textBlocks.forEach((blk, i) => {
+        const raw  = (blk.content || '').replace(/<[^>]*>/g, '').trim();
+        const snip = raw.split(/\s+/).slice(0, 5).join(' ');
+        if (!snip) return;
+        const [ox, oy] = offsets[i] || [0, 0];
+        const t = svgEl('text', {
+          x: room.cx + ox, y: room.cy + oy,
+          'text-anchor': 'middle',
+          'font-family': 'EB Garamond, serif',
+          'font-style': 'italic',
+          'font-size': '9',
+          fill: '#0f0f0f',
+          opacity: '0.22',
+          'pointer-events': 'none'
+        });
+        t.textContent = snip;
+        room._gFrags.appendChild(t);
+      });
+
+    } catch (e) {
+      console.warn('[Are.na]', room.name, e);
+    }
+  }
+
+  ROOMS.forEach(r => fetchRoom(r));
+
+  /* ── Panel ────────────────────────────────────────── */
+  const panel    = document.getElementById('panel');
+  const pRoom    = document.getElementById('panel-room');
+  const pCount   = document.getElementById('panel-count');
+  const pFrags   = document.getElementById('panel-frags');
+  const btnEnter = document.getElementById('btn-enter');
+  const btnLeave = document.getElementById('btn-leave');
+
+  function openPanel(room) {
+    const url = `https://www.are.na/channel/${room.slug}`;
+    pRoom.textContent  = room.name;
+    pCount.textContent = `${room._count} trace${room._count !== 1 ? 's' : ''}`;
+
+    pFrags.innerHTML = '';
+    (room._blocks || [])
+      .filter(b => b.class === 'Text')
+      .slice(0, 5)
+      .forEach(blk => {
+        const raw  = (blk.content || '').replace(/<[^>]*>/g, '').trim();
+        const snip = raw.split(/\s+/).slice(0, 5).join(' ');
+        if (!snip) return;
+        const div = document.createElement('div');
+        div.className   = 'frag-item';
+        div.textContent = snip + '…';
+        pFrags.appendChild(div);
+      });
+
+    btnEnter.href = url;
+    btnLeave.href = url;
+    panel.classList.add('open');
+  }
+
+  document.getElementById('panel-close').addEventListener('click', () => {
+    panel.classList.remove('open');
+  });
+
+  /* ── Custom cursor ────────────────────────────────── */
+  const cursor = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+  });
+
+  const interactiveEls = [
+    ...document.querySelectorAll('nav a'),
+    document.getElementById('panel-close'),
+    btnEnter,
+    btnLeave,
+  ];
+  interactiveEls.forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('grow'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('grow'));
+  });
+
+})();
+</script>
+</body>
+</html>
