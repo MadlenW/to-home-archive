@@ -380,8 +380,8 @@
       if (!res.ok) return;
       const data = await res.json();
 
-      const count    = typeof data.length === 'number' ? data.length : 0;
       const contents = Array.isArray(data.contents) ? data.contents : [];
+      const count    = contents.length;
 
       room._count  = count;
       room._blocks = contents;
