@@ -1,2 +1,29 @@
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; overflow: hidden; background: #080808; }
+
+/*
+  CSS custom properties updated every frame by AtmosphereBridge (inside the R3F Canvas).
+  Defaults match the living-room starting atmosphere.
+*/
+:root {
+  --live-light-color: #FFD4C2;
+  --live-fog-color:   #120810;
+  --live-bg-color:    #120810;
+}
+
+/*
+  html keeps a dark fallback for the brief pre-canvas load flash.
+  body is transparent — the WebGL Canvas is the sole background layer.
+*/
+html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #080808;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}

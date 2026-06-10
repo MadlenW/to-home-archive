@@ -44,6 +44,21 @@ function lerpColor(baseHex: string, spikeHex: string, t: number): string {
   return '#' + _ca.getHexString()
 }
 
+// ─── Atmosphere bridge ────────────────────────────────────────────────────────
+// Writes liveConfig values as CSS custom properties on :root every frame so
+// HTML overlay components (NavigationHUD, etc.) can read live atmosphere colors
+// without subscribing to React state or triggering re-renders.
+
+function AtmosphereBridge() {
+  useFrame(() => {
+    const el = document.documentElement
+    el.style.setProperty('--live-light-color', liveConfig.current.lightColor)
+    el.style.setProperty('--live-fog-color',   liveConfig.current.fogColor)
+    el.style.setProperty('--live-bg-color',    liveConfig.current.backgroundColor)
+  })
+  return null
+}
+
 // ─── Atmosphere decay ─────────────────────────────────────────────────────────
 // Runs BEFORE RoomView in the scene graph (registered earlier → runs first in
 // R3F's frame loop) so liveConfig is updated before SkyDome/Particles/Lights
@@ -232,7 +247,7 @@ export function CanvasContainer() {
 
   return (
     <Canvas
-      style={{ position: 'fixed', inset: 0, width: '100%', height: '100%' }}
+      style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
       gl={{ antialias: true, alpha: false, stencil: false, powerPreference: 'high-performance' }}
       dpr={[1, 2]}
       camera={{ fov: FP_FOV, near: 0.1, far: 120 }}
@@ -244,9 +259,12 @@ export function CanvasContainer() {
       <CameraController />
 
       {/*
-        AtmosphereDecay runs BEFORE RoomView so it writes liveConfig.current
-        on the same frame before SkyDome / Particles / Lights read it.
+        AtmosphereBridge writes liveConfig → CSS custom properties each frame
+        so HTML overlays (NavigationHUD, etc.) can read live atmosphere colors.
+        AtmosphereDecay runs BEFORE RoomView so liveConfig is up-to-date when
+        SkyDome / Particles / Lights read it in their own useFrame callbacks.
       */}
+      <AtmosphereBridge />
       <AtmosphereDecay />
 
       <Suspense fallback={null}>

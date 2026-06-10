@@ -44,7 +44,8 @@ const roomNameStyle: CSSProperties = {
   fontSize:        9,
   textTransform:   'uppercase',
   letterSpacing:   '0.13em',
-  color:           'rgba(255,255,255,0.28)',
+  color:           'var(--live-light-color)',
+  opacity:         0.72,
 }
 
 const bottomBar: CSSProperties = {
@@ -72,7 +73,7 @@ function LoopDots({ activeRoomId }: { activeRoomId: string | null }) {
             height:          id === activeRoomId ? 7 : 4,
             borderRadius:    '50%',
             background:      id === activeRoomId
-              ? 'rgba(255,255,255,0.75)'
+              ? 'var(--live-light-color)'
               : 'rgba(255,255,255,0.18)',
             transition:      'width 0.3s, height 0.3s, background 0.3s',
             pointerEvents:   'none',
@@ -127,15 +128,16 @@ export function NavigationHUD() {
                 ...backBtn,
                 fontSize:    13,
                 lineHeight:  1,
-                color:       'rgba(255,255,255,0.32)',
+                color:       'var(--live-light-color)',
+                opacity:     0.55,
                 padding:     '1px 0 2px',
               }}
               onClick={() => setPortalOpen(true)}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)'
+                ;(e.currentTarget as HTMLElement).style.opacity = '1'
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.32)'
+                ;(e.currentTarget as HTMLElement).style.opacity = '0.55'
               }}
               title="Add to archive"
             >
