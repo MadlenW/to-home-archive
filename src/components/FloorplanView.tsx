@@ -1,34 +1,39 @@
 'use client'
 
-import { useLoader, ThreeEvent } from '@react-three/fiber'
-import { SVGLoader } from 'three-stdlib'
+import { useLoader, ThreeEvent }     from '@react-three/fiber'
+import { SVGLoader }                  from 'three-stdlib'
 import { useMemo, useRef, useCallback } from 'react'
 import {
   ShapeGeometry,
   DoubleSide,
   Color,
-  Shape,
-  Vector3,
-  Mesh,
   MeshStandardMaterial,
+  Vector3,
+  PlaneGeometry,
 } from 'three'
 import { ROOM_IDS, RoomId, useExperienceStore } from '../stores/useExperienceStore'
-import { baseVisualConfig } from '../config/rooms'
+import { useAtmosphereStore }         from '../stores/useAtmosphereStore'
+import { baseVisualConfig }           from '../config/rooms'
 
 // ─── SVG coordinate system ────────────────────────────────────────────────────
-// The floorplan SVG has a single compound path (no per-room IDs).
-// We parse it for the visual floor outline, then overlay 5 named interactive
-// zone meshes at positions inferred from the path geometry.
+//
+// viewBox="0 0 811.59 566.95" — one compound <path> with two sub-paths:
+//   1. M738.36,23.59 ... — main apartment outline
+//   2. M761.14,141.53 ... Z — kitchen bay-window detail
+//
+// The group transform in FloorSVG converts SVG pixel space → 3D world space:
+//   scale(SCALE)  →  rotate(-π/2 around X)  →  translate to centre
+//
+// After those three operations, a point (x_svg, y_svg) lands at:
+//   world_x =  (x_svg − W/2) · SCALE
+//   world_y =  0
+//   world_z = −(y_svg − H/2) · SCALE
+// which is exactly what svgToWorld() computes, so zone centres are consistent.
 
 const SVG_W = 811.59
-const SVG_H = 566.95
-const SCALE = 1 / 55  // SVG units → 3D world units  (~14.8 × 10.3 world units)
+const SVG_H  = 566.95
+const SCALE  = 1 / 55   // ≈ 14.76 × 10.31 world units total
 
-/**
- * Maps SVG pixel coordinates to centred 3D world-space [X, 0, Z].
- * SVG origin is top-left; Y flips to become –Z so north in the SVG
- * corresponds to +Z in the scene (away from the default camera).
- */
 function svgToWorld(svgX: number, svgY: number): [number, number, number] {
   return [
     (svgX - SVG_W / 2) * SCALE,
@@ -38,18 +43,18 @@ function svgToWorld(svgX: number, svgY: number): [number, number, number] {
 }
 
 // ─── Room zone definitions ────────────────────────────────────────────────────
-// cx / cy  : zone centre in SVG pixel space
-// rx / rz  : half-extents in 3D world units (shape is centred on world position)
+// cx / cy  : room centre in SVG pixel space
+// rw / rh  : PlaneGeometry half-extents in world units (hit area, not visual)
 
-const ROOM_ZONES: Record<RoomId, { cx: number; cy: number; rx: number; rz: number }> = {
-  'kitchen':      { cx: 680, cy: 115, rx: 1.80, rz: 1.55 },
-  'hallway':      { cx: 400, cy: 220, rx: 1.50, rz: 1.25 },
-  'bathroom':     { cx: 135, cy: 150, rx: 1.50, rz: 1.45 },
-  'bedroom':      { cx: 210, cy: 460, rx: 2.50, rz: 1.70 },
-  'living-room':  { cx: 540, cy: 450, rx: 2.65, rz: 1.85 },
+const ROOM_ZONES: Record<RoomId, { cx: number; cy: number; rw: number; rh: number }> = {
+  'kitchen':     { cx: 680, cy: 115, rw: 2.0, rh: 1.8 },
+  'hallway':     { cx: 400, cy: 220, rw: 1.8, rh: 1.4 },
+  'bathroom':    { cx: 135, cy: 150, rw: 1.8, rh: 1.6 },
+  'bedroom':     { cx: 210, cy: 460, rw: 2.8, rh: 2.0 },
+  'living-room': { cx: 540, cy: 450, rw: 3.0, rh: 2.2 },
 }
 
-/** World-space centre Vector3 for each room — consumed by the camera controller. */
+/** World-space centre for each room — consumed by CameraController on room entry. */
 export const ROOM_WORLD_POSITIONS = ROOM_IDS.reduce<Record<RoomId, Vector3>>(
   (acc, id) => {
     const z = ROOM_ZONES[id]
@@ -60,50 +65,89 @@ export const ROOM_WORLD_POSITIONS = ROOM_IDS.reduce<Record<RoomId, Vector3>>(
   {} as Record<RoomId, Vector3>,
 )
 
-// ─── Shape builder ────────────────────────────────────────────────────────────
+// ─── SVG floor outline ────────────────────────────────────────────────────────
 
-function makeRoundedRect(rx: number, rz: number): Shape {
-  const s = new Shape()
-  const r = Math.min(rx, rz) * 0.12
-  s.moveTo(-rx + r, -rz)
-  s.lineTo( rx - r, -rz)
-  s.quadraticCurveTo( rx, -rz,  rx, -rz + r)
-  s.lineTo( rx,  rz - r)
-  s.quadraticCurveTo( rx,  rz,  rx - r,  rz)
-  s.lineTo(-rx + r,  rz)
-  s.quadraticCurveTo(-rx,  rz, -rx,  rz - r)
-  s.lineTo(-rx, -rz + r)
-  s.quadraticCurveTo(-rx, -rz, -rx + r, -rz)
-  return s
+function FloorSVG() {
+  const svgData  = useLoader(SVGLoader, '/floorplan.svg')
+
+  // Tint the floor with the currently active room's fog colour.
+  // config only changes on room switch — no per-frame React re-renders.
+  const fogColor = useAtmosphereStore((s) => s.config.fogColor)
+
+  const geometries = useMemo<ShapeGeometry[]>(() => {
+    const out: ShapeGeometry[] = []
+    for (const path of svgData.paths) {
+      // toShapes(true) enforces CCW winding; compound sub-paths that wind
+      // clockwise inside a CCW parent are treated as holes automatically.
+      const shapes = path.toShapes(true)
+      for (const shape of shapes) {
+        out.push(new ShapeGeometry(shape, 12))
+      }
+    }
+    return out
+  }, [svgData])
+
+  // Three-step group transform — order: scale → rotate → translate.
+  // After scale(SCALE):  local (x, y, 0) → (x·s, y·s, 0)
+  // After rot(–π/2, X):  y component folds into –Z: (x·s, 0, –y·s)
+  // After translate:     offset so SVG centre aligns with world origin.
+  return (
+    <group
+      scale={[SCALE, SCALE, SCALE]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[-(SVG_W / 2) * SCALE, 0.01, (SVG_H / 2) * SCALE]}
+    >
+      {geometries.map((geo, i) => (
+        <mesh key={i} geometry={geo} receiveShadow>
+          <meshBasicMaterial
+            color={fogColor}
+            transparent
+            opacity={0.45}
+            side={DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
 }
 
-// ─── Room zone mesh ───────────────────────────────────────────────────────────
+// ─── Room hit zone ────────────────────────────────────────────────────────────
+// A flat, invisible PlaneGeometry placed over each room area.
+// Solely for pointer-event detection — no visual primitive geometry is rendered.
+// On hover it fades in a subtle accent glow derived from the room's atmosphere.
 
-function RoomZoneMesh({ roomId }: { roomId: RoomId }) {
+function RoomHitZone({ roomId }: { roomId: RoomId }) {
   const setView = useExperienceStore((s) => s.setView)
-  const config  = baseVisualConfig[roomId]
   const zone    = ROOM_ZONES[roomId]
+  const cfg     = baseVisualConfig[roomId]
 
   const [wx, , wz] = svgToWorld(zone.cx, zone.cy)
 
+  // PlaneGeometry sits in the XY plane; -π/2 rotation around X lays it flat
+  // so it faces upward and raycasts correctly from the top-down camera.
   const geo = useMemo(
-    () => new ShapeGeometry(makeRoundedRect(zone.rx, zone.rz), 4),
-    [zone.rx, zone.rz],
+    () => new PlaneGeometry(zone.rw * 2, zone.rh * 2),
+    [zone.rw, zone.rh],
   )
 
   const matRef = useRef<MeshStandardMaterial>(null)
 
   const onPointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
-    if (!matRef.current) return
-    matRef.current.opacity           = 0.52
-    matRef.current.emissiveIntensity = 0.72
+    if (matRef.current) {
+      matRef.current.opacity           = 0.32
+      matRef.current.emissiveIntensity = 0.60
+    }
+    document.body.style.cursor = 'pointer'
   }, [])
 
   const onPointerOut = useCallback(() => {
-    if (!matRef.current) return
-    matRef.current.opacity           = 0.20
-    matRef.current.emissiveIntensity = 0.18
+    if (matRef.current) {
+      matRef.current.opacity           = 0.0
+      matRef.current.emissiveIntensity = 0.0
+    }
+    document.body.style.cursor = ''
   }, [])
 
   const onClick = useCallback(
@@ -117,68 +161,23 @@ function RoomZoneMesh({ roomId }: { roomId: RoomId }) {
   return (
     <mesh
       geometry={geo}
-      // ShapeGeometry lies in the local XY plane; rotating –π/2 around X
-      // lays it flat: local X → world X, local Y → world –Z.
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[wx, 0.015, wz]}
+      position={[wx, 0.02, wz]}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
       onClick={onClick}
     >
       <meshStandardMaterial
         ref={matRef}
-        color={new Color(config.backgroundColor)}
-        emissive={new Color(config.lightColor)}
-        emissiveIntensity={0.18}
+        color={new Color(cfg.backgroundColor)}
+        emissive={new Color(cfg.lightColor)}
+        emissiveIntensity={0.0}
         transparent
-        opacity={0.20}
+        opacity={0.0}
         side={DoubleSide}
         depthWrite={false}
       />
     </mesh>
-  )
-}
-
-// ─── SVG floor outline ────────────────────────────────────────────────────────
-
-function FloorOutline() {
-  const svgData = useLoader(SVGLoader, '/floorplan.svg')
-
-  const geometries = useMemo(() => {
-    const result: ShapeGeometry[] = []
-    for (const path of svgData.paths) {
-      for (const shape of SVGLoader.createShapes(path)) {
-        result.push(new ShapeGeometry(shape, 12))
-      }
-    }
-    return result
-  }, [svgData])
-
-  // The group transforms SVG pixel coordinates to centred world-space:
-  //   1. scale  : SVG px → world units
-  //   2. rotate : lay the XY shape flat into the XZ plane (–π/2 around X)
-  //   3. translate: centre the result at the scene origin
-  //
-  // After scale + rotation, a point (svgX, svgY) lands at
-  //   world (svgX·s, 0, –svgY·s) — offset by (–W/2·s, 0, +H/2·s) to centre.
-  return (
-    <group
-      scale={[SCALE, SCALE, SCALE]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[-(SVG_W / 2) * SCALE, 0, (SVG_H / 2) * SCALE]}
-    >
-      {geometries.map((geo, i) => (
-        <mesh key={i} geometry={geo} receiveShadow>
-          <meshStandardMaterial
-            color="#1a1a1a"
-            transparent
-            opacity={0.70}
-            side={DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-    </group>
   )
 }
 
@@ -187,9 +186,9 @@ function FloorOutline() {
 export function FloorplanView() {
   return (
     <group>
-      <FloorOutline />
+      <FloorSVG />
       {ROOM_IDS.map((id) => (
-        <RoomZoneMesh key={id} roomId={id} />
+        <RoomHitZone key={id} roomId={id} />
       ))}
     </group>
   )
