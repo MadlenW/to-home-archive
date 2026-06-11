@@ -1,116 +1,187 @@
 'use client'
 
 import { useEffect, useRef, useMemo } from 'react'
-import { useFrame }                   from '@react-three/fiber'
+import { useFrame, useThree }         from '@react-three/fiber'
 import {
   AmbientLight,
   BackSide,
-  AdditiveBlending,
-  BufferGeometry,
-  Float32BufferAttribute,
+  Color,
+  DoubleSide,
+  FogExp2,
   Mesh,
-  Points,
   PointLight,
-  PointsMaterial,
-  MeshBasicMaterial,
+  SphereGeometry,
 } from 'three'
 import { useExperienceStore }              from '../stores/useExperienceStore'
+import type { RoomId }                     from '../stores/useExperienceStore'
 import { useAtmosphereStore, liveConfig }  from '../stores/useAtmosphereStore'
-import { ROOM_WORLD_POSITIONS }   from './FloorplanView'
-import { useArenaData }           from '../hooks/useArenaData'
-import { FloatingCard }           from './FloatingCard'
-import type { Observation }       from '../hooks/useArenaData'
+import { ROOM_WORLD_POSITIONS }            from './FloorplanView'
+import { useArenaData }                    from '../hooks/useArenaData'
+import { FloatingCard }                    from './FloatingCard'
+import type { Observation }                from '../hooks/useArenaData'
+import { MediumMaterial, MediumMat, MEDIUM_BY_ROOM, FOG_SCALE } from './MediumMaterial'
 
-// ─── Sky dome ─────────────────────────────────────────────────────────────────
+// ─── Standard enclosure (modes 0 – 3) ────────────────────────────────────────
+// Single BackSide sphere following the camera. One material instance, zero
+// draw-call overhead beyond a normal mesh.
 
-function SkyDome() {
-  const config  = useAtmosphereStore((s) => s.config)
+interface EnclosureProps {
+  sphereGeo: SphereGeometry
+  roomScale: [number, number, number]
+}
+
+function StandardEnclosure({ sphereGeo, roomScale }: EnclosureProps) {
+  const material = useMemo(() => {
+    const m = new MediumMaterial() as unknown as MediumMat
+    m.side  = BackSide
+    m.uLayer = 0.0
+    return m
+  }, [])
+
   const meshRef = useRef<Mesh>(null)
-  const matRef  = useRef<MeshBasicMaterial>(null)
+  const _base   = useMemo(() => new Color('#fcfbf9'), [])
+  const _atm    = useMemo(() => new Color(), [])
 
-  useFrame(({ camera }) => {
+  useEffect(() => () => { material.dispose() }, [material])
+
+  useFrame(({ clock, camera, size }) => {
+    const { activeRoomId } = useExperienceStore.getState()
+    const mt = activeRoomId ? (MEDIUM_BY_ROOM[activeRoomId as RoomId] ?? 0) : 0
+    const lc = liveConfig.current
+    const t  = clock.getElapsedTime()
+
     if (meshRef.current) meshRef.current.position.copy(camera.position)
-    if (matRef.current)  matRef.current.color.set(liveConfig.current.fogColor)
+
+    material.uTime       = t
+    material.uMediumType = mt
+    material.uIntensity  = lc.lightIntensity * 0.55
+    material.uNoiseScale = 0.35 + lc.textureNoiseLevel * 1.0
+    material.uRoughness  = 0.6
+    material.uWindowSize.set(size.width, size.height)
+
+    _base.set('#fcfbf9')
+    _atm.set(lc.fogColor)
+    _base.lerp(_atm, 0.18)
+    material.uBaseColor.copy(_base)
   })
 
   return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[50, 24, 24]} />
-      <meshBasicMaterial
-        ref={matRef}
-        color={config.fogColor}
-        side={BackSide}
-        depthWrite={false}
-      />
-    </mesh>
+    <mesh ref={meshRef} geometry={sphereGeo} material={material} scale={roomScale} />
   )
 }
 
-// ─── Atmosphere particles ─────────────────────────────────────────────────────
+// ─── Fur / Cloud enclosure (mode 4) ──────────────────────────────────────────
+// 16 concentric shells share one SphereGeometry. Each shell has its own
+// MediumMaterial instance with a fixed uLayer (0 = root, 1 = tip).
+// Shells render back-to-front (outermost first) via explicit renderOrder so
+// alpha-blending accumulates correctly. depthWrite={false} prevents z-fighting.
 
-const PARTICLE_COUNT = 380
+const SHELL_COUNT = 16
 
-function AtmosphereParticles() {
-  const config     = useAtmosphereStore((s) => s.config)
-  const activeRoom = useExperienceStore((s) => s.activeRoomId)
-  const pointsRef  = useRef<Points>(null)
-  const matRef     = useRef<PointsMaterial>(null)
+function FurShells({ sphereGeo, roomScale }: EnclosureProps) {
+  // One material per shell — uLayer is fixed at creation time, never changes
+  const shellMats = useMemo(() => {
+    return Array.from({ length: SHELL_COUNT }, (_, i) => {
+      const layer = i / (SHELL_COUNT - 1)
+      const m     = new MediumMaterial() as unknown as MediumMat
+      m.side        = DoubleSide
+      m.transparent = true
+      m.depthWrite  = false
+      m.uMediumType = 4.0
+      m.uLayer      = layer
+      return m
+    })
+  }, [])
 
-  const { geo, base, offsets } = useMemo(() => {
-    const base    = new Float32Array(PARTICLE_COUNT * 3)
-    const offsets = new Float32Array(PARTICLE_COUNT)
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const theta     = Math.random() * Math.PI * 2
-      const r         = 2.5 + Math.random() * 12
-      base[i * 3 + 0] = Math.cos(theta) * r
-      base[i * 3 + 1] = (Math.random() - 0.5) * 6
-      base[i * 3 + 2] = Math.sin(theta) * r
-      offsets[i]       = Math.random() * Math.PI * 2
-    }
-    const live = new Float32Array(base)
-    const g    = new BufferGeometry()
-    g.setAttribute('position', new Float32BufferAttribute(live, 3))
-    return { geo: g, base, offsets }
-  }, [activeRoom])
+  const meshRefs = useRef<(Mesh | null)[]>(Array(SHELL_COUNT).fill(null))
+  const _base    = useMemo(() => new Color('#fcfbf9'), [])
+  const _atm     = useMemo(() => new Color(), [])
+
+  useEffect(() => () => { shellMats.forEach((m) => m.dispose()) }, [shellMats])
 
   useFrame(({ clock, camera }) => {
-    if (!pointsRef.current) return
-    const live = pointsRef.current.geometry.attributes.position.array as Float32Array
-    const t    = clock.elapsedTime
-    const spd  = liveConfig.current.particleMotionSpeed
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const o         = offsets[i]
-      live[i * 3 + 0] = base[i * 3 + 0] + Math.sin(t * 0.22 * spd + o)       * 0.45
-      live[i * 3 + 1] = base[i * 3 + 1] + Math.sin(t * 0.31 * spd + o * 1.3) * 0.52
-      live[i * 3 + 2] = base[i * 3 + 2] + Math.cos(t * 0.27 * spd + o * 0.8) * 0.45
+    const lc = liveConfig.current
+    const t  = clock.getElapsedTime()
+
+    _base.set('#fcfbf9')
+    _atm.set(lc.fogColor)
+    _base.lerp(_atm, 0.14)  // lighter atmosphere tint for the airy cloud feel
+
+    for (let i = 0; i < SHELL_COUNT; i++) {
+      const mesh = meshRefs.current[i]
+      if (mesh) mesh.position.copy(camera.position)
+
+      const mat      = shellMats[i]
+      mat.uTime       = t
+      mat.uIntensity  = lc.lightIntensity * 0.65
+      mat.uNoiseScale = 0.30 + lc.textureNoiseLevel * 0.8
+      mat.uBaseColor.copy(_base)
     }
-    pointsRef.current.geometry.attributes.position.needsUpdate = true
-    pointsRef.current.position.copy(camera.position)
-    if (matRef.current) matRef.current.color.set(liveConfig.current.lightColor)
   })
 
   return (
-    <points ref={pointsRef} geometry={geo}>
-      <pointsMaterial
-        ref={matRef}
-        color={config.lightColor}
-        size={0.045}
-        transparent
-        opacity={0.55}
-        blending={AdditiveBlending}
-        depthWrite={false}
-        sizeAttenuation
-      />
-    </points>
+    <>
+      {shellMats.map((mat, i) => (
+        // renderOrder ensures outer (root) shells draw first, inner (tip) shells last
+        <mesh
+          key={i}
+          ref={(el) => { meshRefs.current[i] = el }}
+          geometry={sphereGeo}
+          material={mat}
+          scale={roomScale}
+          renderOrder={i}
+        />
+      ))}
+    </>
   )
+}
+
+// ─── Space enclosure coordinator ──────────────────────────────────────────────
+// Owns the scene fog and the shared sphere geometry. Delegates the actual mesh
+// rendering to StandardEnclosure (modes 0–3) or FurShells (mode 4).
+
+function SpaceEnclosure() {
+  const { scene }  = useThree()
+  const config     = useAtmosphereStore((s) => s.config)
+  const roomId     = useExperienceStore((s) => s.activeRoomId)
+  const medType    = roomId ? (MEDIUM_BY_ROOM[roomId as RoomId] ?? 0) : 0
+
+  // Shared geometry for all enclosure types (created once, disposed on unmount)
+  const sphereGeo  = useMemo(() => new SphereGeometry(30, 48, 32), [])
+
+  useEffect(() => {
+    scene.fog = new FogExp2(liveConfig.current.fogColor, 0.02)
+    return () => {
+      scene.fog = null
+      sphereGeo.dispose()
+    }
+  }, [scene, sphereGeo])
+
+  // Update fog density every frame — AtmosphereDecay sets the base, we apply
+  // the medium-type scale on top (since SpaceEnclosure's useFrame runs after it).
+  useFrame(() => {
+    const { activeRoomId } = useExperienceStore.getState()
+    const mt = activeRoomId ? (MEDIUM_BY_ROOM[activeRoomId as RoomId] ?? 0) : 0
+    const lc = liveConfig.current
+
+    if (scene.fog instanceof FogExp2) {
+      scene.fog.color.set(lc.fogColor)
+      const base = 0.004 + lc.fogDensity * 0.072
+      scene.fog.density = base * (FOG_SCALE[mt] ?? 1.0)
+    }
+  })
+
+  return medType === 4
+    ? <FurShells    sphereGeo={sphereGeo} roomScale={config.roomScale} />
+    : <StandardEnclosure sphereGeo={sphereGeo} roomScale={config.roomScale} />
 }
 
 // ─── Room lighting ────────────────────────────────────────────────────────────
 
 function RoomLights() {
-  const config    = useAtmosphereStore((s) => s.config)
-  const ambRef    = useRef<AmbientLight>(null)
-  const pointRef  = useRef<PointLight>(null)
+  const config   = useAtmosphereStore((s) => s.config)
+  const ambRef   = useRef<AmbientLight>(null)
+  const pointRef = useRef<PointLight>(null)
 
   useFrame(() => {
     const lc = liveConfig.current
@@ -141,7 +212,6 @@ function RoomLights() {
 
 // ─── Card position helpers ────────────────────────────────────────────────────
 
-/** FNV-1a 32-bit hash → [0, 1) float. Stable for any string input. */
 function stableHash(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {
@@ -165,8 +235,8 @@ function computeCardPosition(
   const jitter    = (h0 - 0.5) * (Math.PI * 0.6 / Math.max(total, 1))
   const angle     = baseAngle + jitter
 
-  const radius = 3.2 + h1 * 3.8   // 3.2 – 7.0 units from room centre
-  const height = 0.9 + h2 * 2.8   // 0.9 – 3.7 above floor
+  const radius = 3.2 + h1 * 3.8
+  const height = 0.9 + h2 * 2.8
 
   return [
     center.x + Math.cos(angle) * radius,
@@ -191,20 +261,14 @@ export function RoomView() {
 
   if (currentView !== 'room') return null
 
-  const fogDensity3js = 0.004 + config.fogDensity * 0.072
-
   const observations = (activeRoomId ? data[activeRoomId] : null) ?? []
   const roomCenter   = activeRoomId ? ROOM_WORLD_POSITIONS[activeRoomId] : null
 
   return (
     <>
-      <fogExp2 attach="fog" color={config.fogColor} density={fogDensity3js} />
-
       <RoomLights />
-      <SkyDome />
-      <AtmosphereParticles />
+      <SpaceEnclosure />
 
-      {/* Floating archive cards */}
       {roomCenter && observations.map((obs, i) => (
         <FloatingCard
           key={obs.id}
