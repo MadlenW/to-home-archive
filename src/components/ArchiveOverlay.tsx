@@ -6,61 +6,38 @@ import { useAtmosphereStore }  from '../stores/useAtmosphereStore'
 import { useArenaData }        from '../hooks/useArenaData'
 import type { Observation }    from '../hooks/useArenaData'
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles — light card on frosted-dark backdrop (mirrors ContributionPortal) ─
 
 const backdrop: CSSProperties = {
-  position:            'fixed',
-  inset:               0,
-  display:             'flex',
-  alignItems:          'center',
-  justifyContent:      'center',
-  background:          'rgba(5,5,5,0.91)',
-  backdropFilter:      'blur(18px)',
-  WebkitBackdropFilter: 'blur(18px)',
-  zIndex:              600,
-  fontFamily:          "'Martian Mono', monospace",
+  position:             'fixed',
+  inset:                0,
+  display:              'flex',
+  alignItems:           'center',
+  justifyContent:       'center',
+  background:           'rgba(8,8,8,0.58)',
+  backdropFilter:       'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  zIndex:               600,
+  fontFamily:           "'Martian Mono', monospace",
 }
 
 const panel: CSSProperties = {
-  position:   'relative',
-  width:      'min(500px, 92vw)',
-  maxHeight:  '78vh',
-  overflowY:  'auto',
-  background: 'rgba(11,11,11,0.97)',
-  border:     '1px solid rgba(255,255,255,0.06)',
+  width:        'min(418px, 94vw)',
+  maxHeight:    '78vh',
+  overflowY:    'auto',
+  background:   '#fcfbf9',
+  border:       '1px solid rgba(0,0,0,0.07)',
   borderRadius: 2,
-  padding:    '26px 26px 24px',
-}
-
-const closeBtnBase: CSSProperties = {
-  position:   'absolute',
-  top:        10,
-  right:      14,
-  fontSize:   22,
-  lineHeight: 1,
-  background: 'none',
-  border:     'none',
-  color:      'rgba(255,255,255,0.28)',
-  cursor:     'pointer',
-  fontFamily: 'inherit',
-  padding:    '2px 6px',
-  transition: 'color 0.15s',
+  padding:      '24px 22px 20px',
+  boxShadow:    '0 8px 48px rgba(0,0,0,0.28)',
 }
 
 const dateLine: CSSProperties = {
-  fontSize:        8,
-  textTransform:   'uppercase',
-  letterSpacing:   '0.12em',
-  color:           'rgba(255,255,255,0.2)',
-  marginBottom:    16,
-}
-
-const titleLine: CSSProperties = {
-  fontSize:        10,
-  textTransform:   'uppercase',
-  letterSpacing:   '0.1em',
-  color:           'rgba(255,255,255,0.38)',
-  marginBottom:    14,
+  fontSize:      8,
+  textTransform: 'uppercase',
+  letterSpacing: '0.12em',
+  color:         'rgba(0,0,0,0.30)',
+  marginBottom:  18,
 }
 
 const bodyText: CSSProperties = {
@@ -68,19 +45,29 @@ const bodyText: CSSProperties = {
   fontStyle:   'italic',
   fontSize:    15,
   lineHeight:  1.82,
-  color:       'rgba(255,255,255,0.82)',
+  color:       '#1a1614',
   margin:      0,
   whiteSpace:  'pre-wrap',
 }
 
-const tagRow: CSSProperties = {
-  marginTop:       18,
-  display:         'flex',
-  gap:             8,
-  fontSize:        8,
-  textTransform:   'uppercase',
-  letterSpacing:   '0.1em',
-  color:           'rgba(255,255,255,0.17)',
+const closeRow: CSSProperties = {
+  display:        'flex',
+  justifyContent: 'flex-end',
+  marginTop:      20,
+}
+
+const closeBtnStyle: CSSProperties = {
+  fontSize:      8,
+  textTransform: 'uppercase',
+  letterSpacing: '0.12em',
+  background:    '#1a1614',
+  border:        'none',
+  color:         '#fcfbf9',
+  cursor:        'pointer',
+  fontFamily:    'inherit',
+  padding:       '8px 16px',
+  borderRadius:  1,
+  transition:    'background 0.15s',
 }
 
 // ─── Observation detail panel ─────────────────────────────────────────────────
@@ -98,32 +85,17 @@ function ObservationDetail({
     day: '2-digit', month: 'short', year: 'numeric',
   })
 
-  const panelWithOutline: CSSProperties = {
+  const panelWithAccent: CSSProperties = {
     ...panel,
-    outline: `1px solid ${accentColor}1a`,
+    outline: `1px solid ${accentColor}22`,
   }
 
   return (
     <div style={backdrop} onClick={onClose}>
-      {/* Stop clicks on the panel itself from closing the overlay */}
-      <div style={panelWithOutline} onClick={(e) => e.stopPropagation()}>
-
-        {/* Close button */}
-        <button
-          style={closeBtnBase}
-          onClick={onClose}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#fff' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.28)' }}
-          aria-label="Close"
-        >
-          ×
-        </button>
+      <div style={panelWithAccent} onClick={(e) => e.stopPropagation()}>
 
         {/* Date */}
         <div style={dateLine}>{dateStr}</div>
-
-        {/* Title */}
-        {obs.title && <div style={titleLine}>{obs.title}</div>}
 
         {/* Body: Text */}
         {obs.blockClass === 'Text' && obs.text && (
@@ -134,26 +106,26 @@ function ObservationDetail({
         {obs.blockClass === 'Image' && obs.imageUrl && (
           <img
             src={obs.imageUrl}
-            alt={obs.title}
+            alt=""
             style={{ width: '100%', display: 'block', borderRadius: 1 }}
           />
         )}
 
         {/* Body: Link */}
-        {obs.blockClass === 'Link' && (
+        {obs.blockClass === 'Link' && obs.linkUrl && (
           <a
-            href={obs.linkUrl ?? '#'}
+            href={obs.linkUrl}
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              fontSize:      10,
-              letterSpacing: '0.06em',
-              color:         accentColor,
+              fontSize:       10,
+              letterSpacing:  '0.06em',
+              color:          accentColor,
               textDecoration: 'none',
-              wordBreak:     'break-all',
+              wordBreak:      'break-all',
             }}
           >
-            {obs.title || obs.linkUrl}
+            {obs.linkUrl}
           </a>
         )}
 
@@ -174,16 +146,17 @@ function ObservationDetail({
           )
         )}
 
-        {/* Visual tag metadata */}
-        {obs.tag && (
-          <div style={tagRow}>
-            <span>{obs.tag.material}</span>
-            <span>·</span>
-            <span>{obs.tag.size}</span>
-            <span>·</span>
-            <span>{obs.tag.edge}</span>
-          </div>
-        )}
+        {/* Bottom-right close action */}
+        <div style={closeRow}>
+          <button
+            style={closeBtnStyle}
+            onClick={onClose}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2a28' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#1a1614' }}
+          >
+            close
+          </button>
+        </div>
 
       </div>
     </div>
@@ -192,11 +165,6 @@ function ObservationDetail({
 
 // ─── Public component ─────────────────────────────────────────────────────────
 
-/**
- * Fullscreen HTML detail overlay — mounted outside the R3F Canvas.
- * Renders when an observation is focused (activeObservationId is set).
- * Clicking the backdrop or the × button clears the focused observation.
- */
 export function ArchiveOverlay() {
   const activeObservationId  = useExperienceStore((s) => s.activeObservationId)
   const setActiveObservation = useExperienceStore((s) => s.setActiveObservation)
@@ -205,7 +173,6 @@ export function ArchiveOverlay() {
 
   if (!activeObservationId) return null
 
-  // Look up the observation across all rooms
   let obs: Observation | null = null
   for (const roomObs of Object.values(data)) {
     const found = roomObs.find((o) => o.id === activeObservationId)

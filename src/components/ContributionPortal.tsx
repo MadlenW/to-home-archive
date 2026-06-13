@@ -8,15 +8,12 @@ import { prependObservation }           from '../hooks/useArenaData'
 import type { Observation, BlockClass } from '../hooks/useArenaData'
 
 // ─── Semantic style extraction ────────────────────────────────────────────────
-// Maps descriptive text keywords to color palettes and motion modifiers.
-// All visual changes are smooth gradients — no shocks, no glitches.
 
 function extractSemanticStyle(text: string): SpikeColorTarget {
   const s      = text.toLowerCase()
   const has    = (...kws: string[]) => kws.some((w) => s.includes(w))
   const result: SpikeColorTarget = {}
 
-  // ── Color palette (first match wins) ──────────────────────────────────────
   if (has('dream', 'cloud', 'mist', 'haze', 'pearl', 'gauze', 'veil', 'float', 'drift'))
     Object.assign(result, { fogColor: '#ccc0e8', lightColor: '#e8d4f0' })
   else if (has('warm', 'amber', 'gold', 'honey', 'ember', 'wheat', 'glow', 'harvest'))
@@ -34,13 +31,11 @@ function extractSemanticStyle(text: string): SpikeColorTarget {
   else if (has('pink', 'rose', 'blush', 'petal', 'tender', 'pastel', 'peach'))
     Object.assign(result, { fogColor: '#c87090', lightColor: '#f0b0c0' })
 
-  // ── Fog density ────────────────────────────────────────────────────────────
   if (has('thick', 'dense', 'heavy', 'murk', 'cloud', 'mist', 'fog', 'opaque', 'humid'))
     result.fogDensity = 0.88
   else if (has('clear', 'bright', 'open', 'airy', 'transparent', 'bare', 'exposed'))
     result.fogDensity = 0.12
 
-  // ── Particle motion ────────────────────────────────────────────────────────
   if (has('still', 'silent', 'quiet', 'pause', 'freeze', 'suspended', 'slow', 'dream', 'hold'))
     result.particleMotionSpeed = 0.08
   else if (has('fast', 'quick', 'rush', 'spin', 'swirl', 'wind', 'storm', 'scatter', 'wild'))
@@ -49,7 +44,7 @@ function extractSemanticStyle(text: string): SpikeColorTarget {
   return result
 }
 
-// ─── Stable unique ID for contributed observations ────────────────────────────
+// ─── Stable unique ID ─────────────────────────────────────────────────────────
 
 let _seq = 0
 function nextId(): string {
@@ -57,6 +52,8 @@ function nextId(): string {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+// Light card on frosted-dark backdrop — the bright card floats against the
+// dimmed, blurred room medium behind it.
 
 const backdrop: CSSProperties = {
   position:             'fixed',
@@ -64,34 +61,27 @@ const backdrop: CSSProperties = {
   display:              'flex',
   alignItems:           'center',
   justifyContent:       'center',
-  background:           'rgba(3,3,6,0.68)',
-  backdropFilter:       'blur(14px)',
-  WebkitBackdropFilter: 'blur(14px)',
+  background:           'rgba(8,8,8,0.58)',
+  backdropFilter:       'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
   zIndex:               500,
   fontFamily:           "'Martian Mono', monospace",
 }
 
 const panel: CSSProperties = {
   width:        'min(418px, 94vw)',
-  background:   'rgba(10,10,14,0.97)',
-  border:       '1px solid rgba(255,255,255,0.07)',
+  background:   '#fcfbf9',
+  border:       '1px solid rgba(0,0,0,0.07)',
   borderRadius: 2,
   padding:      '24px 22px 20px',
+  boxShadow:    '0 8px 48px rgba(0,0,0,0.28)',
 }
 
 const sectionHead: CSSProperties = {
   fontSize:      8,
   textTransform: 'uppercase',
   letterSpacing: '0.15em',
-  color:         'rgba(255,255,255,0.2)',
-  marginBottom:  20,
-}
-
-const roomTagStyle: CSSProperties = {
-  fontSize:      8,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  color:         'rgba(255,255,255,0.15)',
+  color:         'rgba(0,0,0,0.32)',
   marginBottom:  22,
 }
 
@@ -100,33 +90,33 @@ const lbl: CSSProperties = {
   fontSize:      7,
   textTransform: 'uppercase',
   letterSpacing: '0.14em',
-  color:         'rgba(255,255,255,0.25)',
+  color:         'rgba(0,0,0,0.30)',
   marginBottom:  7,
 }
 
 const textareaBase: CSSProperties = {
-  width:       '100%',
-  minHeight:   82,
-  background:  'rgba(255,255,255,0.03)',
-  border:      '1px solid rgba(255,255,255,0.08)',
+  width:        '100%',
+  minHeight:    82,
+  background:   'rgba(0,0,0,0.03)',
+  border:       '1px solid rgba(0,0,0,0.10)',
   borderRadius: 1,
-  color:       'rgba(255,255,255,0.75)',
-  fontFamily:  'inherit',
-  fontSize:    11,
-  lineHeight:  1.72,
-  padding:     '8px 10px',
-  resize:      'none',
-  outline:     'none',
+  color:        'rgba(0,0,0,0.80)',
+  fontFamily:   'inherit',
+  fontSize:     11,
+  lineHeight:   1.72,
+  padding:      '8px 10px',
+  resize:       'none',
+  outline:      'none',
   marginBottom: 14,
-  boxSizing:   'border-box' as const,
+  boxSizing:    'border-box' as const,
 }
 
 const inputBase: CSSProperties = {
   width:        '100%',
-  background:   'rgba(255,255,255,0.03)',
-  border:       '1px solid rgba(255,255,255,0.08)',
+  background:   'rgba(0,0,0,0.03)',
+  border:       '1px solid rgba(0,0,0,0.10)',
   borderRadius: 1,
-  color:        'rgba(255,255,255,0.55)',
+  color:        'rgba(0,0,0,0.65)',
   fontFamily:   'inherit',
   fontSize:     10,
   padding:      '7px 10px',
@@ -147,7 +137,7 @@ const cancelBtnStyle: CSSProperties = {
   letterSpacing: '0.12em',
   background:    'none',
   border:        'none',
-  color:         'rgba(255,255,255,0.22)',
+  color:         'rgba(0,0,0,0.28)',
   cursor:        'pointer',
   fontFamily:    'inherit',
   padding:       '5px 0',
@@ -157,31 +147,24 @@ const submitBtnStyle: CSSProperties = {
   fontSize:      8,
   textTransform: 'uppercase',
   letterSpacing: '0.12em',
-  background:    'rgba(255,255,255,0.05)',
-  border:        '1px solid rgba(255,255,255,0.1)',
-  color:         'rgba(255,255,255,0.62)',
+  background:    '#1a1614',
+  border:        'none',
+  color:         '#fcfbf9',
   cursor:        'pointer',
   fontFamily:    'inherit',
-  padding:       '6px 14px',
+  padding:       '8px 16px',
   borderRadius:  1,
+  transition:    'background 0.15s',
 }
 
 const errStyle: CSSProperties = {
   fontSize:     9,
-  color:        'rgba(255,110,90,0.8)',
+  color:        'rgba(170,30,15,0.85)',
   marginBottom: 14,
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-/**
- * Contribution overlay — collects a text fragment or URL and:
- *   1. Prepends a new Observation into the active room's data array.
- *   2. Fires an atmospheric spike with semantic color/motion overrides
- *      derived from the submitted text content.
- *
- * Pointer drag is locked while the portal is open (see useSpatialLook).
- */
 export function ContributionPortal() {
   const activeRoomId  = useExperienceStore((s) => s.activeRoomId)
   const setPortalOpen = useExperienceStore((s) => s.setPortalOpen)
@@ -226,34 +209,20 @@ export function ContributionPortal() {
       isMock:       false,
     }
 
-    // Raw object shape that computeSpikeState (via extractFeaturesFromObservation) reads
-    const rawForSpike = {
-      content: content.trim() || linkUrl.trim(),
-      class:   blockClass,
-    }
-
-    // Semantic color + motion overrides from the submitted text
     const semanticStyle = extractSemanticStyle(content.trim() || linkUrl.trim())
+    const rawForSpike   = { content: content.trim() || linkUrl.trim(), class: blockClass }
 
-    // Prepend card (triggers FloatingCard re-render via dataListeners)
     prependObservation(activeRoomId, newObs)
-
-    // Fire atmospheric transformation — quantitative spike + semantic overrides
     setSpike(rawForSpike, Object.keys(semanticStyle).length > 0 ? semanticStyle : null)
 
     close()
   }
-
-  const roomLabel = activeRoomId
-    ? activeRoomId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    : ''
 
   return (
     <div style={backdrop} onClick={close}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>
 
         <div style={sectionHead}>add to archive</div>
-        <div style={roomTagStyle}>→ {roomLabel}</div>
 
         <label style={lbl}>text fragment</label>
         <textarea
@@ -281,16 +250,16 @@ export function ContributionPortal() {
           <button
             style={cancelBtnStyle}
             onClick={close}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.48)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.22)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(0,0,0,0.55)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(0,0,0,0.28)' }}
           >
             cancel
           </button>
           <button
             style={submitBtnStyle}
             onClick={handleSubmit}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2a28' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#1a1614' }}
           >
             submit
           </button>

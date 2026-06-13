@@ -17,26 +17,25 @@ import { useArenaData }                from '../hooks/useArenaData'
 
 // ─── Camera constants ─────────────────────────────────────────────────────────
 
-const FP_POSITION = new Vector3(0, 20, 6)
-const FP_LOOKAT   = new Vector3(0,  0, 0)
-const FP_FOV      = 45
+const FP_POSITION  = new Vector3(0, 20, 6)
+const FP_LOOKAT    = new Vector3(0,  0, 0)
+const FP_FOV       = 45
 
-const ROOM_Y         = 1.7
-const ROOM_Z_ENTRY   = 2.5
-const LOOK_DIST      = 5
-const ROOM_FOV       = 68
-const DAMP_λ         = 3.5
-const LOOK_DAMP_λ    = 7.0
+// Submerged position: camera drops below the floorplan plane (Y=0) for room mode.
+// No Z offset — the plunge lands directly beneath the room's world centre.
+const SUBMERGE_Y   = -3.0          // units below the floorplan
+const PLUNGE_PITCH = -Math.PI / 6  // ~30° downward look-angle on room entry
+
+const LOOK_DIST    = 5
+const ROOM_FOV     = 68
+const DAMP_λ       = 3.5
+const LOOK_DAMP_λ  = 7.0
 
 // ─── Pre-allocated Color instances for lerpColor (no per-frame allocation) ───
 
 const _ca = new Color()
 const _cb = new Color()
 
-/**
- * Interpolates two hex color strings.
- * At t=0 → baseline, at t=1 → spike.
- */
 function lerpColor(baseHex: string, spikeHex: string, t: number): string {
   _ca.set(baseHex)
   _cb.set(spikeHex)
@@ -45,9 +44,6 @@ function lerpColor(baseHex: string, spikeHex: string, t: number): string {
 }
 
 // ─── Atmosphere bridge ────────────────────────────────────────────────────────
-// Writes liveConfig values as CSS custom properties on :root every frame so
-// HTML overlay components (NavigationHUD, etc.) can read live atmosphere colors
-// without subscribing to React state or triggering re-renders.
 
 function AtmosphereBridge() {
   useFrame(() => {
@@ -60,9 +56,6 @@ function AtmosphereBridge() {
 }
 
 // ─── Atmosphere decay ─────────────────────────────────────────────────────────
-// Runs BEFORE RoomView in the scene graph (registered earlier → runs first in
-// R3F's frame loop) so liveConfig is updated before SkyDome/Particles/Lights
-// read it in their own useFrame callbacks.
 
 function AtmosphereDecay() {
   const { scene }    = useThree()
@@ -70,7 +63,6 @@ function AtmosphereDecay() {
   const activeRoomId = useExperienceStore((s) => s.activeRoomId)
   const arenaData    = useArenaData()
 
-  // Accumulated baseline — recomputed only when room or data changes (O(n) call)
   const baselineRef = useRef(liveConfig.current)
   useEffect(() => {
     if (!activeRoomId) return
@@ -81,12 +73,10 @@ function AtmosphereDecay() {
   useFrame(() => {
     if (currentView !== 'room' || !activeRoomId) return
 
-    // Non-reactive reads for the hot path (avoid re-render subscription cost)
     const { spikeDelta, spikeColorTarget, spikeTimestamp } = useAtmosphereStore.getState()
     const b = baselineRef.current
 
     if (!spikeDelta) {
-      // No active spike — mirror baseline into liveConfig
       liveConfig.current.fogDensity          = b.fogDensity
       liveConfig.current.particleDensity     = b.particleDensity
       liveConfig.current.particleMotionSpeed = b.particleMotionSpeed
@@ -102,24 +92,20 @@ function AtmosphereDecay() {
       const timeSec     = (performance.now() - spikeTimestamp) / 1000
       const decayFactor = Math.exp(-(Math.LN2 / 8) * timeSec)
 
-      // ── Quantitative spike (numeric fields only) ───────────────────────────
       liveConfig.current.fogDensity          = Math.min(1, b.fogDensity          + spikeDelta.fogDensity          * decayFactor)
       liveConfig.current.particleDensity     = Math.min(1, b.particleDensity     + spikeDelta.particleDensity     * decayFactor)
       liveConfig.current.particleMotionSpeed = Math.min(1, b.particleMotionSpeed + spikeDelta.particleMotionSpeed * decayFactor)
       liveConfig.current.textureNoiseLevel   = Math.min(1, b.textureNoiseLevel   + spikeDelta.textureNoiseLevel   * decayFactor)
       liveConfig.current.lightIntensity      = Math.min(3, b.lightIntensity      + spikeDelta.lightIntensity      * decayFactor)
       liveConfig.current.saturation          = Math.min(2, b.saturation          + spikeDelta.saturation          * decayFactor)
-      liveConfig.current.hueShift            = b.hueShift   // not part of spike
-      liveConfig.current.roomScale           = b.roomScale  // not part of spike
+      liveConfig.current.hueShift            = b.hueShift
+      liveConfig.current.roomScale           = b.roomScale
 
-      // ── Semantic overrides (fog density + motion) ──────────────────────────
       if (spikeColorTarget?.fogDensity !== undefined)
         liveConfig.current.fogDensity = b.fogDensity + (spikeColorTarget.fogDensity - b.fogDensity) * decayFactor
       if (spikeColorTarget?.particleMotionSpeed !== undefined)
         liveConfig.current.particleMotionSpeed = b.particleMotionSpeed + (spikeColorTarget.particleMotionSpeed - b.particleMotionSpeed) * decayFactor
 
-      // ── Semantic color interpolation ───────────────────────────────────────
-      // Colors aren't in computeSpikeState; we drive them from semantic analysis.
       liveConfig.current.fogColor = spikeColorTarget?.fogColor
         ? lerpColor(b.fogColor, spikeColorTarget.fogColor, decayFactor)
         : b.fogColor
@@ -130,13 +116,11 @@ function AtmosphereDecay() {
         ? lerpColor(b.backgroundColor, spikeColorTarget.backgroundColor, decayFactor)
         : b.backgroundColor
 
-      // ── Clear fully-decayed spike to stop per-frame computation ───────────
       if (decayFactor < 0.01) {
         useAtmosphereStore.getState().setSpike(null, null)
       }
     }
 
-    // Push fog changes directly to the Three.js scene (bypasses React props)
     if (scene.fog instanceof FogExp2) {
       scene.fog.color.set(liveConfig.current.fogColor)
       scene.fog.density = 0.004 + liveConfig.current.fogDensity * 0.072
@@ -147,6 +131,11 @@ function AtmosphereDecay() {
 }
 
 // ─── Camera controller ────────────────────────────────────────────────────────
+// Floorplan → room: camera plunges from Y=20 straight down through the
+// floorplan plane (Y=0) to SUBMERGE_Y below. X/Z converge on the room's world
+// centre with no forward Z offset. The sphere enclosure follows camera.position
+// each frame (see SpaceEnclosure in RoomView), so the room medium is always
+// centred on the viewer — no floor plane visible from below.
 
 function CameraController() {
   const { camera } = useThree()
@@ -175,8 +164,13 @@ function CameraController() {
     const viewChanged = prevView.current !== currentView
     if (viewChanged) {
       if (currentView === 'room') {
+        // Enter plunge: reset look state and start with a downward pitch so the
+        // camera appears to look along the dive axis as it drops through the floor.
         resetLook()
+        lookRefs.targetPitch = PLUNGE_PITCH
+        lookRefs.livePitch   = PLUNGE_PITCH
       } else {
+        // Return to floorplan: smooth liveAt transition from current camera state
         const y = lookRefs.liveYaw
         const p = lookRefs.livePitch
         liveAt.current.set(
@@ -195,8 +189,10 @@ function CameraController() {
       targetFov.current = FP_FOV
 
     } else if (activeRoomId != null) {
+      // Plunge target: directly below the room's world centre, submerged.
+      // No Z entry offset — the motion is purely vertical (plus X/Z convergence).
       const centre = ROOM_WORLD_POSITIONS[activeRoomId]
-      roomTargetPos.current.set(centre.x, ROOM_Y, centre.z + ROOM_Z_ENTRY)
+      roomTargetPos.current.set(centre.x, SUBMERGE_Y, centre.z)
       damp3(cam.position, roomTargetPos.current, DAMP_λ, delta)
 
       const lookDecay     = 1 - Math.exp(-LOOK_DAMP_λ * delta)
@@ -245,6 +241,10 @@ const CA_OFFSET = new Vector2(0.0004, 0.0004)
 export function CanvasContainer() {
   useSpatialLook()
 
+  // Subscribe here so that conditional FloorplanView render is driven by React
+  // state, which triggers immediately when setView() is called.
+  const currentView = useExperienceStore((s) => s.currentView)
+
   return (
     <Canvas
       style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
@@ -258,18 +258,21 @@ export function CanvasContainer() {
       <FloorplanLights />
       <CameraController />
 
-      {/*
-        AtmosphereBridge writes liveConfig → CSS custom properties each frame
-        so HTML overlays (NavigationHUD, etc.) can read live atmosphere colors.
-        AtmosphereDecay runs BEFORE RoomView so liveConfig is up-to-date when
-        SkyDome / Particles / Lights read it in their own useFrame callbacks.
-      */}
       <AtmosphereBridge />
       <AtmosphereDecay />
 
-      <Suspense fallback={null}>
-        <FloorplanView />
-      </Suspense>
+      {/*
+        FloorplanView mounts only in floorplan mode. Unmounting it immediately
+        when a room is entered (a) hides the floor geometry before the camera
+        crosses it and (b) triggers BackgroundController's cleanup, which
+        restores the dark canvas background for the room medium.
+        useLoader caches the SVG globally, so remounting on return is instant.
+      */}
+      {currentView === 'floorplan' && (
+        <Suspense fallback={null}>
+          <FloorplanView />
+        </Suspense>
+      )}
 
       <RoomView />
 

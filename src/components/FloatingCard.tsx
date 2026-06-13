@@ -1,18 +1,15 @@
 'use client'
 
-import { useRef, useMemo, useState, useEffect, Suspense } from 'react'
+import { useRef, useMemo, useState, Suspense } from 'react'
 import { useFrame }          from '@react-three/fiber'
 import type { ThreeEvent }   from '@react-three/fiber'
 import { Billboard, Text, useTexture } from '@react-three/drei'
-import {
-  Shape, ShapeGeometry, DoubleSide, Color, Vector3,
-  Group, MeshBasicMaterial,
-} from 'three'
+import { Vector3, Group }    from 'three'
 import { useExperienceStore } from '../stores/useExperienceStore'
 import type { Observation }   from '../hooks/useArenaData'
 import type { RoomVisualState } from '../config/rooms'
 
-// ─── Card geometry ─────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const CARD_DIMS = {
   small:  { hw: 0.42, hh: 0.28 },
@@ -20,43 +17,39 @@ const CARD_DIMS = {
   large:  { hw: 0.88, hh: 0.60 },
 } as const
 
-function makeCardShape(hw: number, hh: number): Shape {
-  const r = Math.min(hw, hh) * 0.14
-  const s = new Shape()
-  s.moveTo(-hw + r, -hh)
-  s.lineTo( hw - r, -hh)
-  s.quadraticCurveTo( hw, -hh,  hw, -hh + r)
-  s.lineTo( hw,  hh - r)
-  s.quadraticCurveTo( hw,  hh,  hw - r,  hh)
-  s.lineTo(-hw + r,  hh)
-  s.quadraticCurveTo(-hw,  hh, -hw,  hh - r)
-  s.lineTo(-hw, -hh + r)
-  s.quadraticCurveTo(-hw, -hh, -hw + r, -hh)
-  return s
-}
-
-// ─── LOD constant ─────────────────────────────────────────────────────────────
-
 const TIER_DIST   = 15
 const HOVER_SCALE = 1.07
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// High-contrast charcoal — legible against every room medium and the fog shaders.
+const TEXT_COLOR = '#1a1614'
 
-function ImagePlane({ url, hw, hh }: { url: string; hw: number; hh: number }) {
+// renderOrder above FurShells (0–15) and StandardEnclosure (0) so text is
+// never occluded by the sphere shaders regardless of medium type.
+const TEXT_RENDER_ORDER = 16
+
+// ─── Image sub-components ─────────────────────────────────────────────────────
+// No placeholder — images appear when loaded; nothing shown while loading.
+
+function ImagePlane({
+  url, hw, hh, onClick, onPointerOver, onPointerOut,
+}: {
+  url:            string
+  hw:             number
+  hh:             number
+  onClick:        (e: ThreeEvent<MouseEvent>) => void
+  onPointerOver:  (e: ThreeEvent<PointerEvent>) => void
+  onPointerOut:   () => void
+}) {
   const texture = useTexture(url)
   return (
-    <mesh position={[0, 0, 0.012]}>
+    <mesh
+      renderOrder={TEXT_RENDER_ORDER}
+      onClick={onClick}
+      onPointerOver={onPointerOver}
+      onPointerOut={onPointerOut}
+    >
       <planeGeometry args={[hw * 1.86, hh * 1.86]} />
       <meshBasicMaterial map={texture} transparent depthWrite={false} />
-    </mesh>
-  )
-}
-
-function ImagePlaceholder({ hw, hh, color }: { hw: number; hh: number; color: string }) {
-  return (
-    <mesh position={[0, 0, 0.012]}>
-      <planeGeometry args={[hw * 1.86, hh * 1.86]} />
-      <meshBasicMaterial color={color} transparent opacity={0.15} depthWrite={false} />
     </mesh>
   )
 }
@@ -76,38 +69,33 @@ export function FloatingCard({
   roomConfig,
   index,
 }: FloatingCardProps) {
-  const [tier, setTier] = useState(1)
-  const tierRef         = useRef(1)
+  // Tier: 1 = distant (>15 units), 2 = near. Used for text truncation + image LOD.
+  const [tier, setTier]         = useState(1)
+  const tierRef                 = useRef(1)
 
-  const isFocused          = useExperienceStore((s) => s.activeObservationId === observation.id)
+  // isHovered drives fillOpacity via React re-render; isHoveredRef drives scale
+  // via useFrame (avoids stale closure on the hot path).
+  const [isHovered, setIsHovered] = useState(false)
+  const isHoveredRef              = useRef(false)
+
+  const isFocused            = useExperienceStore((s) => s.activeObservationId === observation.id)
   const setActiveObservation = useExperienceStore((s) => s.setActiveObservation)
 
-  // Stable per-card phase offsets derived from index (golden-ratio sequence)
   const phase = useMemo(() => ({
     x: ((index * 1.618033988) % 1.0) * Math.PI * 2,
     y: ((index * 2.414213562) % 1.0) * Math.PI * 2,
     z: ((index * 0.732050808) % 1.0) * Math.PI * 2,
   }), [index])
 
-  const dims    = CARD_DIMS[observation.sizeEstimate]
-  const cardGeo = useMemo(
-    () => new ShapeGeometry(makeCardShape(dims.hw, dims.hh), 4),
-    [dims.hw, dims.hh],
-  )
-  useEffect(() => () => { cardGeo.dispose() }, [cardGeo])
-
+  const dims      = CARD_DIMS[observation.sizeEstimate]
   const worldBase = useMemo(() => new Vector3(...basePosition), [basePosition])
-
-  const groupRef   = useRef<Group>(null)
-  const bgMatRef   = useRef<MeshBasicMaterial>(null)
-  const liveOpacity = useRef(0.18)
-  const liveScale   = useRef(1.0)
-  const hovered     = useRef(false)
+  const groupRef  = useRef<Group>(null)
+  const liveScale = useRef(1.0)
 
   useFrame(({ camera, clock }, delta) => {
     if (!groupRef.current) return
 
-    // ── Tier detection ─────────────────────────────────────────────────────────
+    // ── Tier detection ────────────────────────────────────────────────────────
     const dist    = camera.position.distanceTo(worldBase)
     const newTier = dist > TIER_DIST ? 1 : 2
     if (newTier !== tierRef.current) {
@@ -115,17 +103,9 @@ export function FloatingCard({
       setTier(newTier)
     }
 
-    const decay = 1 - Math.exp(-6 * delta)
-
-    // ── Opacity ────────────────────────────────────────────────────────────────
-    const targetOpacity = isFocused
-      ? 0
-      : newTier === 1 ? 0.22 : hovered.current ? 0.90 : 0.70
-    liveOpacity.current += (targetOpacity - liveOpacity.current) * decay
-    if (bgMatRef.current) bgMatRef.current.opacity = liveOpacity.current
-
-    // ── Scale ──────────────────────────────────────────────────────────────────
-    const targetScale = hovered.current && !isFocused ? HOVER_SCALE : 1.0
+    // ── Scale ─────────────────────────────────────────────────────────────────
+    const decay       = 1 - Math.exp(-6 * delta)
+    const targetScale = isHoveredRef.current && !isFocused ? HOVER_SCALE : 1.0
     liveScale.current += (targetScale - liveScale.current) * decay
     groupRef.current.scale.setScalar(liveScale.current)
 
@@ -142,7 +122,7 @@ export function FloatingCard({
     }
   })
 
-  // ── Event handlers ─────────────────────────────────────────────────────────
+  // ── Event handlers ────────────────────────────────────────────────────────
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
@@ -151,91 +131,76 @@ export function FloatingCard({
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
-    hovered.current = true
+    isHoveredRef.current = true
+    setIsHovered(true)
+    document.body.style.cursor = 'pointer'
   }
 
   const handlePointerOut = () => {
-    hovered.current = false
+    isHoveredRef.current = false
+    setIsHovered(false)
+    document.body.style.cursor = ''
   }
 
-  // ── Content ────────────────────────────────────────────────────────────────
+  // ── Derived render values ─────────────────────────────────────────────────
 
-  const displayText = observation.text.slice(0, tier === 1 ? 55 : 230)
+  // Text opacity: distant = faint, near = present, hover = full, focused = hidden
+  const fillOpacity = isFocused ? 0 : tier === 1 ? 0.38 : isHovered ? 1.0 : 0.82
 
-  const cardColor = useMemo(() => {
-    const base   = new Color(roomConfig.backgroundColor)
-    const accent = new Color(roomConfig.lightColor)
-    return '#' + base.lerp(accent, 0.09).getHexString()
-  }, [roomConfig.backgroundColor, roomConfig.lightColor])
+  // Tier 1 shows a brief excerpt; tier 2 shows the full fragment up to 260 chars
+  const displayText = observation.text.slice(0, tier === 1 ? 60 : 260)
 
-  const textColor = tier === 1
-    ? 'rgba(210,210,210,0.48)'
-    : roomConfig.fogColor
+  const isTextLike = (
+    observation.blockClass === 'Text' ||
+    observation.blockClass === 'Link' ||
+    observation.blockClass === 'Unknown'
+  )
+
+  // Shared props for every <Text> node: high-contrast charcoal, always in front,
+  // never writes depth so it doesn't occlude the medium shaders behind it.
+  const textProps = {
+    color:                TEXT_COLOR,
+    fillOpacity,
+    renderOrder:          TEXT_RENDER_ORDER,
+    'material-depthWrite':  false,
+    'material-transparent': true,
+    textAlign:            'center' as const,
+    anchorX:              'center' as const,
+    anchorY:              'middle' as const,
+    onClick:              handleClick,
+    onPointerOver:        handlePointerOver,
+    onPointerOut:         handlePointerOut,
+  }
 
   return (
     <group ref={groupRef} position={basePosition}>
       <Billboard follow lockX={false} lockY={false} lockZ={false}>
 
-        {/* Card background plane */}
-        <mesh
-          geometry={cardGeo}
-          onClick={handleClick}
-          onPointerOver={handlePointerOver}
-          onPointerOut={handlePointerOut}
-        >
-          <meshBasicMaterial
-            ref={bgMatRef}
-            color={cardColor}
-            transparent
-            opacity={0.22}
-            side={DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-
-        {/* Text content */}
-        {(observation.blockClass === 'Text' ||
-          observation.blockClass === 'Link' ||
-          observation.blockClass === 'Unknown') &&
-          displayText.trim() && (
-            <Text
-              position={[0, 0, 0.016]}
-              fontSize={0.066}
-              maxWidth={dims.hw * 1.86}
-              color={textColor}
-              textAlign="center"
-              anchorX="center"
-              anchorY="middle"
-            >
-              {displayText}
-            </Text>
-          )}
-
-        {/* Image content: placeholder (Tier 1) or texture (Tier 2) */}
-        {observation.blockClass === 'Image' && (
-          tier >= 2 && observation.imageUrl ? (
-            <Suspense
-              fallback={
-                <ImagePlaceholder hw={dims.hw} hh={dims.hh} color={roomConfig.lightColor} />
-              }
-            >
-              <ImagePlane url={observation.imageUrl} hw={dims.hw} hh={dims.hh} />
-            </Suspense>
-          ) : (
-            <ImagePlaceholder hw={dims.hw} hh={dims.hh} color={roomConfig.lightColor} />
-          )
+        {/* Text / Link / Unknown — pure floating charcoal text, no backing shape */}
+        {isTextLike && displayText.trim() && (
+          <Text fontSize={0.068} maxWidth={dims.hw * 2.4} {...textProps}>
+            {displayText}
+          </Text>
         )}
 
-        {/* Media: play glyph */}
-        {observation.blockClass === 'Media' && (
-          <Text
-            position={[0, 0, 0.016]}
-            fontSize={0.16}
-            color={textColor}
-            anchorX="center"
-            anchorY="middle"
-          >
-            {'▶'}
+        {/* Image — texture only, no placeholder; appears when in range and loaded */}
+        {observation.blockClass === 'Image' && tier >= 2 && observation.imageUrl && (
+          <Suspense fallback={null}>
+            <ImagePlane
+              url={observation.imageUrl}
+              hw={dims.hw}
+              hh={dims.hh}
+              onClick={handleClick}
+              onPointerOver={handlePointerOver}
+              onPointerOut={handlePointerOut}
+            />
+          </Suspense>
+        )}
+
+        {/* Media — bare URL as minimal floating label */}
+        {observation.blockClass === 'Media' && observation.linkUrl && (
+          <Text fontSize={0.052} maxWidth={dims.hw * 2.4} {...textProps}>
+            {observation.linkUrl}
           </Text>
         )}
 
