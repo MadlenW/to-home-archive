@@ -9,6 +9,11 @@ import { useExperienceStore } from '../stores/useExperienceStore'
 import type { Observation }   from '../hooks/useArenaData'
 import type { RoomVisualState } from '../config/rooms'
 
+// ─── Text cleaning ────────────────────────────────────────────────────────────
+
+const cleanText = (rawText: string) =>
+  rawText.replace(/\[col:.*?\]/g, '').trim()
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CARD_DIMS = {
@@ -148,7 +153,7 @@ export function FloatingCard({
   const fillOpacity = isFocused ? 0 : tier === 1 ? 0.38 : isHovered ? 1.0 : 0.82
 
   // Tier 1 shows a brief excerpt; tier 2 shows the full fragment up to 260 chars
-  const displayText = observation.text.slice(0, tier === 1 ? 60 : 260)
+  const displayText = cleanText(observation.text).slice(0, tier === 1 ? 60 : 260)
 
   const isTextLike = (
     observation.blockClass === 'Text' ||

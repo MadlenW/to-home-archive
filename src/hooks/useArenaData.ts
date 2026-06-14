@@ -37,7 +37,7 @@ const ARENA_BASE      = 'https://api.are.na/v2/channels'
 const PER_CHANNEL     = 20
 const FETCH_TIMEOUT   = 6000
 
-const ARENA_SLUGS: Record<RoomId, string> = {
+const ARENA_CHANNEL_SLUGS: Record<RoomId, string> = {
   'kitchen':     'kitchen-_dpxnlj4op8',
   'hallway':     'hallway-pmywetfnlve',
   'bathroom':    'bathroom-6orcuuzqerc',
@@ -130,7 +130,7 @@ function normalise(block: ArenaBlock, roomId: RoomId): Observation {
 // ─── Fetch single channel ──────────────────────────────────────────────────────
 
 async function fetchRoom(roomId: RoomId): Promise<Observation[]> {
-  const slug  = ARENA_SLUGS[roomId]
+  const slug  = ARENA_CHANNEL_SLUGS[roomId]
   const ctrl  = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
   try {

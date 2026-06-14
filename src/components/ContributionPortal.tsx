@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties } from 'react'
-import { useExperienceStore }           from '../stores/useExperienceStore'
+import { useExperienceStore, ROOM_LABELS } from '../stores/useExperienceStore'
 import { useAtmosphereStore }           from '../stores/useAtmosphereStore'
 import type { SpikeColorTarget }        from '../stores/useAtmosphereStore'
 import { prependObservation }           from '../hooks/useArenaData'
@@ -222,7 +222,9 @@ export function ContributionPortal() {
     <div style={backdrop} onClick={close}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>
 
-        <div style={sectionHead}>add to archive</div>
+        <div style={sectionHead}>
+          {activeRoomId ? ROOM_LABELS[activeRoomId] : 'add to archive'}
+        </div>
 
         <label style={lbl}>text fragment</label>
         <textarea

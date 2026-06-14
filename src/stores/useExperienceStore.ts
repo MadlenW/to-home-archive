@@ -17,6 +17,14 @@ export const ROOM_IDS: RoomId[] = [
   'living-room',
 ]
 
+export const ROOM_LABELS: Record<RoomId, string> = {
+  'kitchen':     '01_threshold',
+  'living-room': '02_wardrobe',
+  'bedroom':     '03_bed matrix',
+  'bathroom':    '04_profile',
+  'hallway':     '05_canopy',
+}
+
 interface ExperienceState {
   currentView:          'floorplan' | 'room'
   activeRoomId:         RoomId | null

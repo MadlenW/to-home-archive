@@ -6,6 +6,11 @@ import { useAtmosphereStore }  from '../stores/useAtmosphereStore'
 import { useArenaData }        from '../hooks/useArenaData'
 import type { Observation }    from '../hooks/useArenaData'
 
+// ─── Text cleaning ────────────────────────────────────────────────────────────
+
+const cleanText = (rawText: string) =>
+  rawText.replace(/\[col:.*?\]/g, '').trim()
+
 // ─── Styles — light card on frosted-dark backdrop (mirrors ContributionPortal) ─
 
 const backdrop: CSSProperties = {
@@ -99,7 +104,7 @@ function ObservationDetail({
 
         {/* Body: Text */}
         {obs.blockClass === 'Text' && obs.text && (
-          <p style={bodyText}>{obs.text}</p>
+          <p style={bodyText}>{cleanText(obs.text)}</p>
         )}
 
         {/* Body: Image */}

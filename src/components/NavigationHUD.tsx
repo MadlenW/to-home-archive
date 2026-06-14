@@ -1,7 +1,7 @@
 'use client'
 
 import { CSSProperties, useState } from 'react'
-import { useExperienceStore } from '../stores/useExperienceStore'
+import { useExperienceStore, ROOM_LABELS } from '../stores/useExperienceStore'
 import { ContributionPortal } from './ContributionPortal'
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -35,6 +35,14 @@ const backBtn: CSSProperties = {
   fontFamily:    'inherit',
 }
 
+const zoneLabelStyle: CSSProperties = {
+  display:       'block',
+  marginTop:     8,
+  fontSize:      10,
+  letterSpacing: '0.06em',
+  color:         'rgba(255,255,255,0.70)',
+}
+
 const addBtnWrap: CSSProperties = {
   position:      'absolute',
   bottom:        28,
@@ -64,6 +72,7 @@ const addBtnBase: CSSProperties = {
 export function NavigationHUD() {
   const currentView   = useExperienceStore((s) => s.currentView)
   const setView       = useExperienceStore((s) => s.setView)
+  const activeRoomId  = useExperienceStore((s) => s.activeRoomId)
   const isPortalOpen  = useExperienceStore((s) => s.isPortalOpen)
   const setPortalOpen = useExperienceStore((s) => s.setPortalOpen)
 
@@ -85,6 +94,9 @@ export function NavigationHUD() {
           >
             ← back
           </button>
+          {activeRoomId && (
+            <span style={zoneLabelStyle}>{ROOM_LABELS[activeRoomId]}</span>
+          )}
         </div>
 
         {/* Bottom-right: prominent archive action — hidden while portal is open */}
