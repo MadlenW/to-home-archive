@@ -38,11 +38,11 @@ const PER_CHANNEL     = 20
 const FETCH_TIMEOUT   = 6000
 
 export const ARENA_CHANNEL_SLUGS: Record<RoomId, string> = {
-  'kitchen':     'kitchen-_dpxnlj4op8',
-  'hallway':     'hallway-pmywetfnlve',
-  'bathroom':    'bathroom-6orcuuzqerc',
-  'bedroom':     'bedroom-cceaffchfdg',
-  'living-room': 'living-room-te9ggrtmjzc',
+  'kitchen':     '01_threshold',
+  'bathroom':    '02_wardrobe',
+  'bedroom':     '03_bed-matrix',
+  'hallway':     '04_profile',
+  'living-room': '05_canopy',
 }
 
 const ROOM_IDS: RoomId[] = ['kitchen', 'hallway', 'bathroom', 'bedroom', 'living-room']
