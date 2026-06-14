@@ -7,8 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "deploy": "node -e \"const fs=require('fs');fs.copyFileSync('next.config.mjs','next.config.mjs.bak');fs.copyFileSync('next.config.gh.mjs','next.config.mjs')\" && next build && node -e \"const fs=require('fs');fs.copyFileSync('next.config.mjs.bak','next.config.mjs');fs.unlinkSync('next.config.mjs.bak');fs.writeFileSync('out/.gitignore','')\" && gh-pages -d out --dotfiles",
-    "install:clean": "npm install --legacy-peer-deps"
+    "lint": "next lint",
+    "deploy": "cp next.config.gh.mjs next.config.mjs && next build && gh-pages -d out --dotfiles && git checkout next.config.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
