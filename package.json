@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:ghpages": "GITHUB_ACTIONS=true NEXT_PUBLIC_BASE_PATH=/to-home-archive next build",
     "start": "next start",
-    "deploy": "gh-pages -d out"
+    "deploy": "npm run build:ghpages && gh-pages -d out"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
