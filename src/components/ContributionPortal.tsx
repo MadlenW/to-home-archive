@@ -224,15 +224,23 @@ export function ContributionPortal() {
     prependObservation(activeRoomId, newObs)
     setSpike(rawForSpike, Object.keys(semanticStyle).length > 0 ? semanticStyle : null)
 
-    // Fire-and-forget POST to Are.na via the Vercel API route
-    fetch(API_ENDPOINT, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        channel_id: ARENA_CHANNEL_SLUGS[activeRoomId],
-        content:    body,
-      }),
-    }).catch(() => { /* silently ignore network errors */ })
+    // POST to Are.na via the Vercel API route
+    console.log('🎯 Target API Endpoint resolved to:', API_ENDPOINT)
+    ;(async () => {
+      try {
+        const res = await fetch(API_ENDPOINT, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            channel_id: ARENA_CHANNEL_SLUGS[activeRoomId],
+            content:    body,
+          }),
+        })
+        console.log('Response status:', res.status)
+      } catch (err) {
+        console.error('❌ Frontend fetch execution threw a local error:', err)
+      }
+    })()
 
     close()
   }
