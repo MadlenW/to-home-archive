@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "cp next.config.gh.mjs next.config.mjs; next build && gh-pages -d out --dotfiles; STATUS=$?; git checkout next.config.mjs; exit $STATUS"
+    "deploy": "cp next.config.gh.mjs next.config.mjs; next build && touch out/.nojekyll && gh-pages -d out --dotfiles; STATUS=$?; git checkout next.config.mjs; exit $STATUS"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
