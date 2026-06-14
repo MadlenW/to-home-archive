@@ -3,3 +3,5 @@ node_modules
 .DS_Store
 tsconfig.tsbuildinfo
 index.html
+.next/
+out/

@@ -2,10 +2,12 @@
   "name": "to-home",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://madlenw.github.io/to-home-archive/",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "deploy": "gh-pages -d out"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
@@ -25,6 +27,7 @@
     "@types/three": "^0.165.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.0",
+    "gh-pages": "^6.3.0",
     "typescript": "^5"
   }
 }

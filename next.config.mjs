@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // App Router is the default in Next.js 14 — no `experimental.appDir` flag needed.
-  // No custom `output`, no custom `distDir`.
-  // Vercel reads this file to confirm the project is a Next.js App Router build.
+  output:      'export',
+  basePath:    '/to-home-archive',
+  assetPrefix: '/to-home-archive/',
 }
 
 export default nextConfig

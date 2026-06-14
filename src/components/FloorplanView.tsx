@@ -11,12 +11,14 @@ import { ROOM_IDS, RoomId, useExperienceStore } from '../stores/useExperienceSto
 
 // ─── Scan texture paths ───────────────────────────────────────────────────────
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+
 const SCAN_URLS: string[] = [
-  '/tohome1.png',
-  '/tohome2.png',
-  '/tohome3.png',
-  '/tohome4.png',
-  '/tohome5.png',
+  `${BASE}/tohome1.png`,
+  `${BASE}/tohome2.png`,
+  `${BASE}/tohome3.png`,
+  `${BASE}/tohome4.png`,
+  `${BASE}/tohome5.png`,
 ]
 
 // ─── Geometry ─────────────────────────────────────────────────────────────────
