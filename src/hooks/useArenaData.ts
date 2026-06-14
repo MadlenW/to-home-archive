@@ -33,7 +33,7 @@ export type ArenaDataMap = Partial<Record<RoomId, Observation[]>>
 
 // ─── Are.na channel configuration ─────────────────────────────────────────────
 
-const ARENA_BASE      = 'https://api.are.na/v3/channels'
+const ARENA_BASE      = 'https://api.are.na/v2/channels'
 const PER_CHANNEL     = 20
 const FETCH_TIMEOUT   = 6000
 
@@ -43,6 +43,15 @@ export const ARENA_CHANNEL_SLUGS: Record<RoomId, string> = {
   'bedroom':     '03_bed-matrix',
   'hallway':     '04_profile',
   'living-room': '05_canopy',
+}
+
+// Numeric Are.na channel IDs — required for the POST /v3/blocks endpoint
+export const ARENA_CHANNEL_IDS: Record<RoomId, number> = {
+  'kitchen':     5244721,
+  'bathroom':    5244727,
+  'bedroom':     5244726,
+  'hallway':     5244724,
+  'living-room': 5244723,
 }
 
 const ROOM_IDS: RoomId[] = ['kitchen', 'hallway', 'bathroom', 'bedroom', 'living-room']
@@ -135,7 +144,7 @@ async function fetchRoom(roomId: RoomId): Promise<Observation[]> {
   const timer     = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
   try {
     const res  = await fetch(
-      `${ARENA_BASE}/${cleanSlug}?per=${PER_CHANNEL}`,
+      `${ARENA_BASE}/${cleanSlug}/contents?per=${PER_CHANNEL}`,
       { signal: ctrl.signal },
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

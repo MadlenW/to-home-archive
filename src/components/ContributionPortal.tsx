@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from 'react'
 import { useExperienceStore, ROOM_LABELS } from '../stores/useExperienceStore'
 import { useAtmosphereStore }           from '../stores/useAtmosphereStore'
 import type { SpikeColorTarget }        from '../stores/useAtmosphereStore'
-import { prependObservation, ARENA_CHANNEL_SLUGS } from '../hooks/useArenaData'
+import { prependObservation, ARENA_CHANNEL_IDS } from '../hooks/useArenaData'
 import type { Observation, BlockClass }            from '../hooks/useArenaData'
 
 // Route to Vercel API when browsing the static GitHub Pages build;
@@ -232,7 +232,7 @@ export function ContributionPortal() {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
-            channel_id: ARENA_CHANNEL_SLUGS[activeRoomId],
+            channel_id: ARENA_CHANNEL_IDS[activeRoomId],
             content:    body,
           }),
         })
