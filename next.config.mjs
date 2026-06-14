@@ -4,6 +4,7 @@ const isGithubPages = process.env.IS_GITHUB_PAGES === 'true'
 
 const nextConfig = {
   output: 'export',
+  trailingSlash: true,
   basePath: isGithubPages ? '/to-home-archive' : '',
   assetPrefix: isGithubPages ? '/to-home-archive' : '',
   images: {
