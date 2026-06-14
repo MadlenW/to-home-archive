@@ -130,12 +130,12 @@ function normalise(block: ArenaBlock, roomId: RoomId): Observation {
 // ─── Fetch single channel ──────────────────────────────────────────────────────
 
 async function fetchRoom(roomId: RoomId): Promise<Observation[]> {
-  const slug  = ARENA_CHANNEL_SLUGS[roomId]
-  const ctrl  = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
+  const cleanSlug = ARENA_CHANNEL_SLUGS[roomId].trim()
+  const ctrl      = new AbortController()
+  const timer     = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
   try {
     const res  = await fetch(
-      `${ARENA_BASE}/${slug}?per=${PER_CHANNEL}`,
+      `${ARENA_BASE}/${cleanSlug}?per=${PER_CHANNEL}`,
       { signal: ctrl.signal },
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
