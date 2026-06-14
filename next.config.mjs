@@ -1,12 +1,16 @@
 /** @type {import('next').NextConfig} */
-const isGithubActions = process.env.GITHUB_ACTIONS === 'true'
+// Check if the build target is explicitly set to GitHub Pages
+const isGithubPages = process.env.IS_GITHUB_PAGES === 'true'
 
 const nextConfig = {
-  output:      'export',
-  basePath:    isGithubActions ? '/to-home-archive' : '',
-  assetPrefix: isGithubActions ? '/to-home-archive' : '',
+  output: 'export',
+  basePath: isGithubPages ? '/to-home-archive' : '',
+  assetPrefix: isGithubPages ? '/to-home-archive' : '',
   images: {
     unoptimized: true,
+  },
+  env: {
+    NEXT_PUBLIC_BASE_PATH: isGithubPages ? '/to-home-archive' : '',
   },
 }
 

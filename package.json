@@ -6,9 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:ghpages": "GITHUB_ACTIONS=true NEXT_PUBLIC_BASE_PATH=/to-home-archive next build",
     "start": "next start",
-    "deploy": "npm run build:ghpages && gh-pages -d out"
+    "deploy": "cross-env IS_GITHUB_PAGES=true npm run build && gh-pages -d out"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
@@ -26,6 +25,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.165.0",
+    "cross-env": "^10.1.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.0",
     "gh-pages": "^6.3.0",
