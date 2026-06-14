@@ -4,8 +4,15 @@ import { useState, type CSSProperties } from 'react'
 import { useExperienceStore, ROOM_LABELS } from '../stores/useExperienceStore'
 import { useAtmosphereStore }           from '../stores/useAtmosphereStore'
 import type { SpikeColorTarget }        from '../stores/useAtmosphereStore'
-import { prependObservation }           from '../hooks/useArenaData'
-import type { Observation, BlockClass } from '../hooks/useArenaData'
+import { prependObservation, ARENA_CHANNEL_SLUGS } from '../hooks/useArenaData'
+import type { Observation, BlockClass }            from '../hooks/useArenaData'
+
+// Route to Vercel API when browsing the static GitHub Pages build;
+// fall back to the local Next.js route otherwise.
+const API_ENDPOINT =
+  typeof window !== 'undefined' && window.location.hostname.includes('github.io')
+    ? 'https://to-home-archive.vercel.app/api/contribute'
+    : '/api/contribute'
 
 // ─── Semantic style extraction ────────────────────────────────────────────────
 
@@ -181,7 +188,7 @@ export function ContributionPortal() {
     setErr(null)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const hasText = content.trim().length > 0
     const hasLink = linkUrl.trim().length > 0
 
@@ -193,6 +200,7 @@ export function ContributionPortal() {
 
     const blockClass: BlockClass = hasLink ? 'Link' : 'Text'
     const words = content.trim().split(/\s+/).filter(Boolean).length
+    const body  = content.trim() || linkUrl.trim()
 
     const newObs: Observation = {
       id:           nextId(),
@@ -209,11 +217,22 @@ export function ContributionPortal() {
       isMock:       false,
     }
 
-    const semanticStyle = extractSemanticStyle(content.trim() || linkUrl.trim())
-    const rawForSpike   = { content: content.trim() || linkUrl.trim(), class: blockClass }
+    const semanticStyle = extractSemanticStyle(body)
+    const rawForSpike   = { content: body, class: blockClass }
 
+    // Optimistic local update — visible immediately regardless of network
     prependObservation(activeRoomId, newObs)
     setSpike(rawForSpike, Object.keys(semanticStyle).length > 0 ? semanticStyle : null)
+
+    // Fire-and-forget POST to Are.na via the Vercel API route
+    fetch(API_ENDPOINT, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        channel_id: ARENA_CHANNEL_SLUGS[activeRoomId],
+        content:    body,
+      }),
+    }).catch(() => { /* silently ignore network errors */ })
 
     close()
   }
