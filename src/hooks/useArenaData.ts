@@ -33,7 +33,7 @@ export type ArenaDataMap = Partial<Record<RoomId, Observation[]>>
 
 // ─── Are.na channel configuration ─────────────────────────────────────────────
 
-const ARENA_BASE      = 'https://api.are.na/v2/channels'
+const ARENA_BASE      = 'https://api.are.na/v3/channels'
 const PER_CHANNEL     = 20
 const FETCH_TIMEOUT   = 6000
 

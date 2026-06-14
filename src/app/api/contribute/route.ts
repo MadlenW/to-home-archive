@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: CORS_HEADERS })
   }
 
-  const arenaRes = await fetch('https://api.are.na/v2/channels/' + channel_id + '/blocks', {
+  const arenaRes = await fetch('https://api.are.na/v3/channels/' + channel_id + '/blocks', {
     method:  'POST',
     headers: {
       'Content-Type':  'application/json',
