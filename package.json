@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "deploy": "cross-env IS_GITHUB_PAGES=true npm run build && gh-pages -d out",
+    "deploy": "node -e \"const fs=require('fs');fs.copyFileSync('next.config.mjs','next.config.mjs.bak');fs.copyFileSync('next.config.gh.mjs','next.config.mjs')\" && next build && node -e \"const fs=require('fs');fs.copyFileSync('next.config.mjs.bak','next.config.mjs');fs.unlinkSync('next.config.mjs.bak')\" && gh-pages -d out",
     "install:clean": "npm install --legacy-peer-deps"
   },
   "dependencies": {

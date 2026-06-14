@@ -1,18 +1,7 @@
 /** @type {import('next').NextConfig} */
-// Check if the build target is explicitly set to GitHub Pages
-const isGithubPages = process.env.IS_GITHUB_PAGES === 'true'
-
 const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
-  basePath: isGithubPages ? '/to-home-archive' : '',
-  assetPrefix: isGithubPages ? '/to-home-archive' : '',
-  images: {
-    unoptimized: true,
-  },
-  env: {
-    NEXT_PUBLIC_BASE_PATH: isGithubPages ? '/to-home-archive' : '',
-  },
+  // Leave output, basePath, and assetPrefix completely out so Vercel builds normally
+  images: { unoptimized: true },
 }
 
 export default nextConfig
