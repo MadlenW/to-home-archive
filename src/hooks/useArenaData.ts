@@ -135,7 +135,7 @@ async function fetchRoom(roomId: RoomId): Promise<Observation[]> {
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
   try {
     const res  = await fetch(
-      `${ARENA_BASE}/${slug}/contents?per=${PER_CHANNEL}`,
+      `${ARENA_BASE}/${slug}?per=${PER_CHANNEL}`,
       { signal: ctrl.signal },
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
