@@ -101,8 +101,9 @@ export function NavigationHUD() {
 
         {/* Bottom-right: prominent archive action — hidden while portal is open */}
         {!isPortalOpen && (
-          <div style={addBtnWrap}>
+          <div style={addBtnWrap} className="hud-add-wrap">
             <button
+              className="hud-add-btn"
               style={{
                 ...addBtnBase,
                 transform:  addHover ? 'scale(1.04)'  : 'scale(1)',

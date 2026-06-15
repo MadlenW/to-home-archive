@@ -240,7 +240,7 @@ export function ContributionPortal() {
 
   return (
     <div style={backdrop} onClick={close}>
-      <div style={panel} onClick={(e) => e.stopPropagation()}>
+      <div style={panel} className="contribution-panel" onClick={(e) => e.stopPropagation()}>
 
         <div style={sectionHead}>
           {activeRoomId ? ROOM_LABELS[activeRoomId] : 'add to archive'}

@@ -97,10 +97,10 @@ function ObservationDetail({
 
   return (
     <div style={backdrop} onClick={onClose}>
-      <div style={panelWithAccent} onClick={(e) => e.stopPropagation()}>
+      <div style={panelWithAccent} className="archive-panel" onClick={(e) => e.stopPropagation()}>
 
         {/* Date */}
-        <div style={dateLine}>{dateStr}</div>
+        <div style={dateLine} className="archive-date">{dateStr}</div>
 
         {/* Body: Text */}
         {obs.blockClass === 'Text' && obs.text && (
