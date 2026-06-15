@@ -7,12 +7,7 @@ import type { SpikeColorTarget }        from '../stores/useAtmosphereStore'
 import { prependObservation, ARENA_CHANNEL_IDS } from '../hooks/useArenaData'
 import type { Observation, BlockClass }            from '../hooks/useArenaData'
 
-// Route to Vercel API when browsing the static GitHub Pages build;
-// fall back to the local Next.js route otherwise.
-const API_ENDPOINT =
-  typeof window !== 'undefined' && window.location.hostname.includes('github.io')
-    ? 'https://to-home-archive.vercel.app/api/contribute'
-    : '/api/contribute'
+const API_ENDPOINT = 'https://api-archive.to-home.org/api/contribute'
 
 // ─── Semantic style extraction ────────────────────────────────────────────────
 

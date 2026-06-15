@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin':      'https://madlenw.github.io',
+  'Access-Control-Allow-Origin':      'https://archive.to-home.org',
   'Access-Control-Allow-Methods':     'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers':     'Content-Type, Authorization, X-Requested-With, Accept',
   'Access-Control-Allow-Credentials': 'true',
