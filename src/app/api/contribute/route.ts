@@ -20,34 +20,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No token' }, { status: 500, headers: corsHeaders })
   }
 
-  let body: { channel_id?: string; content?: string }
+  let formData: FormData
   try {
-    body = await request.json()
+    formData = await request.formData()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders })
+    return NextResponse.json({ error: 'Invalid form data' }, { status: 400, headers: corsHeaders })
   }
 
-  const { channel_id, content } = body
-  if (!channel_id || !content?.trim()) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: corsHeaders })
+  const channelId = formData.get('channel_id')?.toString()
+  const content   = formData.get('content')?.toString()?.trim()
+  const imageFile = formData.get('image') as File | null
+
+  if (!channelId) {
+    return NextResponse.json({ error: 'Missing channel_id' }, { status: 400, headers: corsHeaders })
+  }
+  if (!content && !(imageFile && imageFile.size > 0)) {
+    return NextResponse.json({ error: 'Missing content or image' }, { status: 400, headers: corsHeaders })
   }
 
-  const arenaRes = await fetch('https://api.are.na/v3/blocks', {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      kind:        'Text',
-      value:       content,
-      channel_ids: [Number(channel_id)],
-    }),
-  })
+  let arenaRes: Response
+
+  if (imageFile && imageFile.size > 0) {
+    const arenaForm = new FormData()
+    arenaForm.append('channel_ids[]', channelId)
+    arenaForm.append('block[kind]', 'Image')
+    arenaForm.append('block[attachment]', imageFile)
+
+    arenaRes = await fetch('https://api.are.na/v2/blocks', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body:    arenaForm,
+    })
+  } else {
+    arenaRes = await fetch('https://api.are.na/v3/blocks', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        kind:        'Text',
+        value:       content,
+        channel_ids: [Number(channelId)],
+      }),
+    })
+  }
 
   const arenaData = await arenaRes.json()
-  return NextResponse.json(arenaData, {
-    status:  200,
-    headers: corsHeaders,
-  })
+  return NextResponse.json(arenaData, { status: 200, headers: corsHeaders })
 }

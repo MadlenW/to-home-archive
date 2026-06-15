@@ -113,18 +113,21 @@ const textareaBase: CSSProperties = {
   boxSizing:    'border-box' as const,
 }
 
-const inputBase: CSSProperties = {
+const fileLabelStyle: CSSProperties = {
+  display:      'block',
   width:        '100%',
   background:   'rgba(0,0,0,0.03)',
   border:       '1px solid rgba(0,0,0,0.10)',
   borderRadius: 1,
-  color:        'rgba(0,0,0,0.65)',
   fontFamily:   'inherit',
   fontSize:     10,
   padding:      '7px 10px',
-  outline:      'none',
   marginBottom: 22,
+  cursor:       'pointer',
   boxSizing:    'border-box' as const,
+  overflow:     'hidden',
+  whiteSpace:   'nowrap' as const,
+  textOverflow: 'ellipsis',
 }
 
 const btnRow: CSSProperties = {
@@ -172,68 +175,63 @@ export function ContributionPortal() {
   const setPortalOpen = useExperienceStore((s) => s.setPortalOpen)
   const setSpike      = useAtmosphereStore((s) => s.setSpike)
 
-  const [content, setContent] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
-  const [err, setErr]         = useState<string | null>(null)
+  const [content,   setContent]   = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [err,       setErr]       = useState<string | null>(null)
 
   const close = () => {
     setPortalOpen(false)
     setContent('')
-    setLinkUrl('')
+    setImageFile(null)
     setErr(null)
   }
 
   const handleSubmit = async () => {
     const hasText = content.trim().length > 0
-    const hasLink = linkUrl.trim().length > 0
+    const hasFile = imageFile !== null
 
-    if (!hasText && !hasLink) {
-      setErr('enter a text fragment or url to contribute')
+    if (!hasText && !hasFile) {
+      setErr('enter a text fragment or upload an image to contribute')
       return
     }
     if (!activeRoomId) return
 
-    const blockClass: BlockClass = hasLink ? 'Link' : 'Text'
+    const blockClass: BlockClass = hasFile ? 'Image' : 'Text'
     const words = content.trim().split(/\s+/).filter(Boolean).length
-    const body  = content.trim() || linkUrl.trim()
+    const previewUrl = hasFile ? URL.createObjectURL(imageFile) : null
 
     const newObs: Observation = {
       id:           nextId(),
       roomId:       activeRoomId,
       blockClass,
       text:         content.trim(),
-      imageUrl:     null,
-      thumbUrl:     null,
-      linkUrl:      hasLink ? linkUrl.trim() : null,
-      title:        '',
-      sizeEstimate: words < 12 ? 'small' : words < 48 ? 'medium' : 'large',
+      imageUrl:     previewUrl,
+      thumbUrl:     previewUrl,
+      linkUrl:      null,
+      title:        imageFile?.name ?? '',
+      sizeEstimate: hasFile ? 'medium' : words < 12 ? 'small' : words < 48 ? 'medium' : 'large',
       timestamp:    new Date(),
       tag:          null,
       isMock:       false,
     }
 
-    const semanticStyle = extractSemanticStyle(body)
-    const rawForSpike   = { content: body, class: blockClass }
+    const semanticStyle = extractSemanticStyle(content.trim())
+    const rawForSpike   = { content: content.trim() || (imageFile?.name ?? ''), class: blockClass }
 
-    // Optimistic local update — visible immediately regardless of network
     prependObservation(activeRoomId, newObs)
     setSpike(rawForSpike, Object.keys(semanticStyle).length > 0 ? semanticStyle : null)
 
-    // POST to Are.na via the Vercel API route
-    console.log('🎯 Target API Endpoint resolved to:', API_ENDPOINT)
+    const fd = new FormData()
+    fd.append('channel_id', String(ARENA_CHANNEL_IDS[activeRoomId]))
+    if (content.trim()) fd.append('content', content.trim())
+    if (imageFile)      fd.append('image', imageFile)
+
     ;(async () => {
       try {
-        const res = await fetch(API_ENDPOINT, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            channel_id: ARENA_CHANNEL_IDS[activeRoomId],
-            content:    body,
-          }),
-        })
+        const res = await fetch(API_ENDPOINT, { method: 'POST', body: fd })
         console.log('Response status:', res.status)
       } catch (err) {
-        console.error('❌ Frontend fetch execution threw a local error:', err)
+        console.error('❌ fetch error:', err)
       }
     })()
 
@@ -259,13 +257,19 @@ export function ContributionPortal() {
           autoFocus
         />
 
-        <label style={lbl}>link / url (optional)</label>
+        <label style={lbl}>image (optional)</label>
+        <label
+          htmlFor="img-upload"
+          style={{ ...fileLabelStyle, color: imageFile ? 'rgba(0,0,0,0.80)' : 'rgba(0,0,0,0.35)' }}
+        >
+          {imageFile ? imageFile.name : 'choose file'}
+        </label>
         <input
-          type="url"
-          style={inputBase}
-          value={linkUrl}
-          onChange={(e) => { setLinkUrl(e.target.value); setErr(null) }}
-          placeholder="https://..."
+          id="img-upload"
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => { setImageFile(e.target.files?.[0] ?? null); setErr(null) }}
         />
 
         {err && <div style={errStyle}>{err}</div>}
